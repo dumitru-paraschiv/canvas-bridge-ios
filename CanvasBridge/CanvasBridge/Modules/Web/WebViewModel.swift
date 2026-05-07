@@ -7,7 +7,7 @@
 
 import Foundation
 import Combine
-import CoreGraphics
+import UIKit
 
 /// Manages the state and communication bridge between the native layer and the Web Canvas.
 @MainActor
@@ -22,10 +22,29 @@ final class WebViewModel: ObservableObject {
     /// Centralized binding to safely dispatch encoded JSON commands to the Web layer.
     @Published var outgoingCommand: String? = nil
     
+    /// The latest captured snapshot of the canvas.
+    @Published var snapshotImage: UIImage? = nil
+    
+    /// A trigger used to signal the UI layer to capture a snapshot.
+    @Published var triggerSnapshot: Bool = false
+    
+    /// Indicates if there was a connection or navigation error.
+    @Published var connectionError: String? = nil
+    
+    /// Indicates whether the WebContent process has crashed or terminated.
+    @Published var isProcessTerminated: Bool = false
+    
+    /// A trigger used to signal the UI layer to reload the canvas environment.
+    @Published var triggerReload: Bool = false
+    
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
     
-    init() {}
+    let webViewService: WebViewService
+    
+    init(webViewService: WebViewService) {
+        self.webViewService = webViewService
+    }
     
     // MARK: - Incoming Communication (JS -> Swift)
     
@@ -100,6 +119,36 @@ final class WebViewModel: ObservableObject {
         let payload = ColorPayload(hexCode: hex)
         let command = CanvasCommand(action: "change_color", payload: payload)
         outgoingCommand = generateCommandString(for: command)
+    }
+    
+    // MARK: - Snapshot Handling
+    
+    /// Triggers the UI to capture a snapshot of the canvas.
+    func requestSnapshot() {
+        triggerSnapshot = true
+    }
+    
+    /// Called by the UI layer when a snapshot is successfully captured.
+    func didCaptureSnapshot(_ image: UIImage) {
+        snapshotImage = image
+        triggerSnapshot = false
+    }
+    
+    // MARK: - Process Monitoring
+    
+    /// Called when the underlying WKWebView WebContent process unexpectedly terminates.
+    func handleProcessTermination() {
+        isCanvasReady = false
+        isProcessTerminated = true
+        connectionError = "The WebContent process terminated unexpectedly."
+        trace("🔄 Process Reset: Resetting canvas state due to termination. UI should attempt reload.")
+    }
+    
+    /// Sets a flag to trigger the UI layer to reload the pre-warmed WebView environment.
+    func reloadCanvas() {
+        isProcessTerminated = false
+        connectionError = nil
+        triggerReload = true
     }
     
     // MARK: - Outgoing Communication (Swift -> JS)

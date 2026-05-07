@@ -15,6 +15,7 @@ struct WebViewUI: UIViewRepresentable {
     
     @ObservedObject var viewModel: WebViewModel
     @Binding var outgoingCommand: String?
+    let webViewService: WebViewService
     
     // MARK: - Coordinator Setup
     
@@ -25,31 +26,19 @@ struct WebViewUI: UIViewRepresentable {
     // MARK: - UIViewRepresentable
     
     func makeUIView(context: Context) -> WKWebView {
-        // 1. Configure the WKWebView
-        let userContentController = WKUserContentController()
+        let webView = webViewService.getWebView()
+        
+        // Update the WKUserContentController to point to the current Coordinator
+        let userContentController = webView.configuration.userContentController
+        
+        // Remove existing handler to prevent crashes if the view is recreated
+        userContentController.removeScriptMessageHandler(forName: "canvasBridge")
+        
         // Register the script message handler named "canvasBridge" to intercept JS messages
         userContentController.add(context.coordinator, name: "canvasBridge")
         
-        let configuration = WKWebViewConfiguration()
-        configuration.userContentController = userContentController
-        
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        
-        // 2. Make the web view feel native (transparent, no scrolling)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.scrollView.backgroundColor = .clear
-        webView.scrollView.isScrollEnabled = false
-        webView.scrollView.bounces = false
-        
-        // 3. Load the local index.html file from the App Bundle
-        // Ensure index.html is added to the Xcode target's Copy Bundle Resources
-        if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        } else {
-            trace("⚠️ Error: index.html not found in the App Bundle.")
-        }
+        // Assign the navigation delegate for security and process monitoring
+        webView.navigationDelegate = context.coordinator
         
         return webView
     }
@@ -69,12 +58,36 @@ struct WebViewUI: UIViewRepresentable {
                 self.outgoingCommand = nil
             }
         }
+        
+        // Handle Snapshot Requests
+        if viewModel.triggerSnapshot {
+            let capturedViewModel = viewModel
+            uiView.takeSnapshot(with: nil) { image, error in
+                if let error = error {
+                    trace("⚠️ Snapshot Error: \(error.localizedDescription)")
+                } else if let image = image {
+                    Task { @MainActor in
+                        capturedViewModel.didCaptureSnapshot(image)
+                    }
+                }
+            }
+        }
+        
+        // Handle Reload Requests
+        if viewModel.triggerReload {
+            trace("🔄 WebViewUI: Executing WKWebView reload to recover WebContent process.")
+            uiView.reload()
+            
+            Task { @MainActor in
+                self.viewModel.triggerReload = false
+            }
+        }
     }
     
     // MARK: - Coordinator (WKScriptMessageHandler)
     
     @MainActor
-    class Coordinator: NSObject, WKScriptMessageHandler {
+    class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         
         var parent: WebViewUI
         
@@ -92,6 +105,35 @@ struct WebViewUI: UIViewRepresentable {
                     trace("⚠️ Received message body is not a String: \(message.body)")
                 }
             }
+        }
+        
+        // MARK: - WKNavigationDelegate Security & Monitoring
+        
+        /// Enforces strict navigation policies to prevent unauthorized external requests or script injection.
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.cancel)
+                return
+            }
+            
+            // Allow only local file URLs originating from the App Bundle
+            if url.isFileURL && url.path.hasPrefix(Bundle.main.bundlePath) {
+                decisionHandler(.allow)
+            } else {
+                trace("⚠️ Security Alert: Blocked unauthorized navigation attempt to \(url.absoluteString)")
+                decisionHandler(.cancel)
+            }
+        }
+        
+        /// Catches and logs errors during local provisional navigation.
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            trace("❌ WebView Error: Failed provisional navigation with error: \(error.localizedDescription)")
+        }
+        
+        /// Detects if the WebContent process crashes (e.g., due to memory pressure).
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            trace("💥 WebView Crash: The WebContent process terminated unexpectedly.")
+            parent.viewModel.handleProcessTermination()
         }
     }
 }
