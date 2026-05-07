@@ -14,7 +14,9 @@ final class ModuleAssembly: Assembly {
             let viewModel = MainViewModel(
                 model: model
             )
-            let webViewModel = WebViewModel()
+            let webViewModel = WebViewModel(
+                webViewService: r.resolve()
+            )
             let viewUI = MainViewUI(
                 viewModel: viewModel,
                 webViewModel: webViewModel

@@ -25,8 +25,12 @@ Communication occurs over distinct channels:
 
 State history (Undo/Redo) and object rendering (Shapes/Colors) are fully managed via this strict JSON contract.
 
+## Performance & Optimization
+* **Pre-Warming Strategy**: To achieve instantaneous, native-level transition speeds, the `WKWebView` engine is heavily pre-warmed. A dedicated `WebViewService` initializes the WebContent process during the app's launch sequence, entirely decoupling the hybrid environment's load time from UI navigation. This proactively eliminates latency and "white-flash" artifacts.
+
 ## Tech Stack
 * **Minimum Deployment:** iOS 16.0
 * **UI:** SwiftUI, UIKit (Routing)
 * **Web Engine:** WKWebView, HTML5 Canvas, Vanilla JS
+* **State & Performance:** Singleton services for resource-heavy process management (`WebViewService`).
 * **DI & Testing:** Swinject, Swift Testing

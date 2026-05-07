@@ -31,7 +31,11 @@ struct MainViewUI: View {
                 .ignoresSafeArea()
             
             // Bridge Layer
-            WebViewUI(viewModel: webViewModel, outgoingCommand: $webViewModel.outgoingCommand)
+            WebViewUI(
+                viewModel: webViewModel,
+                outgoingCommand: $webViewModel.outgoingCommand,
+                webViewService: webViewModel.webViewService
+            )
                 .ignoresSafeArea()
             
             // Overlay Controls

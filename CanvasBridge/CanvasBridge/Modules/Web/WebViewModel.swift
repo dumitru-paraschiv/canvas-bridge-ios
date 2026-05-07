@@ -31,7 +31,11 @@ final class WebViewModel: ObservableObject {
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
     
-    init() {}
+    let webViewService: WebViewService
+    
+    init(webViewService: WebViewService) {
+        self.webViewService = webViewService
+    }
     
     // MARK: - Incoming Communication (JS -> Swift)
     

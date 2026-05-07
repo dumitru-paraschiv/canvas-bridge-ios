@@ -15,6 +15,7 @@ struct WebViewUI: UIViewRepresentable {
     
     @ObservedObject var viewModel: WebViewModel
     @Binding var outgoingCommand: String?
+    let webViewService: WebViewService
     
     // MARK: - Coordinator Setup
     
@@ -25,31 +26,16 @@ struct WebViewUI: UIViewRepresentable {
     // MARK: - UIViewRepresentable
     
     func makeUIView(context: Context) -> WKWebView {
-        // 1. Configure the WKWebView
-        let userContentController = WKUserContentController()
+        let webView = webViewService.getWebView()
+        
+        // Update the WKUserContentController to point to the current Coordinator
+        let userContentController = webView.configuration.userContentController
+        
+        // Remove existing handler to prevent crashes if the view is recreated
+        userContentController.removeScriptMessageHandler(forName: "canvasBridge")
+        
         // Register the script message handler named "canvasBridge" to intercept JS messages
         userContentController.add(context.coordinator, name: "canvasBridge")
-        
-        let configuration = WKWebViewConfiguration()
-        configuration.userContentController = userContentController
-        
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        
-        // 2. Make the web view feel native (transparent, no scrolling)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.scrollView.backgroundColor = .clear
-        webView.scrollView.isScrollEnabled = false
-        webView.scrollView.bounces = false
-        
-        // 3. Load the local index.html file from the App Bundle
-        // Ensure index.html is added to the Xcode target's Copy Bundle Resources
-        if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        } else {
-            trace("⚠️ Error: index.html not found in the App Bundle.")
-        }
         
         return webView
     }
