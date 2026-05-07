@@ -37,11 +37,19 @@ Sent via `window.updateCanvasState(jsonString)`.
 - **`system_warning`**
   - **Description**: Instructs the web engine to perform system-level operations, such as garbage collection during memory pressure.
   - **Payload**: `{ instruction: String }` (e.g., `"purge_history"`).
+- **`hydrate_state`**
+  - **Description**: Injects a predefined array of shapes into the web engine to restore a previous session.
+  - **Payload**: `{ shapes: [ShapePayload] }`
 
 ### 2. JS to Swift (Events)
 Sent via `window.webkit.messageHandlers.canvasBridge.postMessage(jsonString)`.
 * `event`: String identifying the lifecycle or interaction event.
 * `payload`: Associated data object.
+
+**Data Synchronization**
+- **`sync_state`**
+  - **Description**: Emitted by the web engine after every successful visual mutation to keep the native layer's state perfectly synchronized.
+  - **Payload**: `{ shapes: [ShapePayload] }`
 
 **Lifecycle Events & Pre-Warming**
 Because the `WKWebView` engine is heavily pre-warmed via the `WebViewService` during app launch, the `lifecycle: ready` event may fire *before* the user actively navigates to the canvas screen. 
