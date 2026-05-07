@@ -1,5 +1,5 @@
 # CanvasBridge 🌉
-**Version: v1.1.0**
+**Version: v1.3.0**
 
 A highly polished, production-ready Proof of Concept demonstrating a flawless, bidirectional JSON message bridge between native Swift and a local HTML5/JavaScript canvas.
 
@@ -14,6 +14,7 @@ CanvasBridge explores the architectural patterns required to build a scalable na
 * **Native UX Polish & Grouped Contextual Toolbar:** The web view seamlessly ignores safe areas (via `viewport-fit=cover`), handles Retina DPI scaling, and triggers native physical haptics (`UIImpactFeedbackGenerator`) synced to web canvas interactions. The UI features a newly redesigned, glassmorphic Grouped Contextual Toolbar ensuring scalable, HIG-compliant hit targets as the feature set expands.
 
 ## Features
+* **Security & Resilience:** Implements Strict Navigation Sandboxing to completely block external URL requests and script injections. Features a built-in Renderer Crash Recovery system to detect out-of-process engine terminations and gracefully recover.
 * **Advanced WebKit Snapshotting:** Securely captures the out-of-process web buffer directly into a native `UIImage` using asynchronous `WKWebView` APIs, allowing for seamless export and sharing via the native iOS Share Sheet.
 * **Reactive Rendering & History:** The canvas engine handles dynamic object placement (Rectangles, Circles), dynamic color palettes, and robust history management via `undoStack` and `redoStack`.
 

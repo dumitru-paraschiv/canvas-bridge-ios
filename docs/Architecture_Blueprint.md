@@ -47,3 +47,8 @@ To integrate the hybrid canvas into the native application:
 To eliminate latency and "white-flash" artifacts when loading the hybrid environment, the application utilizes a `WebViewService`.
 - **Pre-Initialization**: The `WebViewService` instantly initializes the `WKWebView` and triggers the WebContent process to load the HTML/JS assets during the app's launch sequence, completely decoupled from UI navigation.
 - **Lifecycle Optimization**: By the time the user navigates to the canvas screen, the JavaScript rendering engine has already booted in the background. The `WebViewUI` simply requests this pre-warmed instance, resulting in instantaneous native-level transition speeds.
+
+## 8. Security & Reliability
+To ensure the hybrid environment is entirely sandboxed and resilient against both external threats and internal memory constraints:
+- **Local-Only Navigation Sandbox**: The `WKNavigationDelegate` strictly enforces a security policy that only permits navigation to local file URLs (`isFileURL`) originating from within the App Bundle. Any external links, redirects, or injected navigation attempts are aggressively intercepted and blocked, preventing unauthorized script execution.
+- **Renderer Crash Recovery**: The native iOS layer actively monitors the out-of-process WebContent renderer. If the process is terminated unexpectedly (e.g., due to system memory pressure), the `WKNavigationDelegate` catches the `webViewWebContentProcessDidTerminate` event. The `WebViewModel` immediately flags the `isProcessTerminated` state, locking down the UI and preparing the bridge for a seamless background reload strategy.

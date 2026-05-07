@@ -45,3 +45,4 @@ Because the `WKWebView` engine is heavily pre-warmed via the `WebViewService` du
 ### 3. Native-Only Actions
 Certain architectural operations are performed entirely on the native layer and bypass the JSON messaging bridge:
 - **Snapshotting**: Triggered natively via the `takeSnapshot(with:)` API directly on the `WKWebView`. This operation securely captures the out-of-process web buffer into a native `UIImage`, relying purely on the static state of the HTML5 canvas at the exact moment of capture without necessitating any JS-side execution or payload overhead.
+- **Navigation Sandboxing**: The native `WKNavigationDelegate` actively monitors all web traffic. External navigation (e.g., clicking hyperlinks, JS redirects) is strictly prohibited and instantly blocked. The bridge is exclusively locked to the local HTML payload.

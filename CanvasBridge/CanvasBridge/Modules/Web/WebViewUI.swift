@@ -37,6 +37,9 @@ struct WebViewUI: UIViewRepresentable {
         // Register the script message handler named "canvasBridge" to intercept JS messages
         userContentController.add(context.coordinator, name: "canvasBridge")
         
+        // Assign the navigation delegate for security and process monitoring
+        webView.navigationDelegate = context.coordinator
+        
         return webView
     }
     
@@ -74,7 +77,7 @@ struct WebViewUI: UIViewRepresentable {
     // MARK: - Coordinator (WKScriptMessageHandler)
     
     @MainActor
-    class Coordinator: NSObject, WKScriptMessageHandler {
+    class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         
         var parent: WebViewUI
         
@@ -92,6 +95,35 @@ struct WebViewUI: UIViewRepresentable {
                     trace("⚠️ Received message body is not a String: \(message.body)")
                 }
             }
+        }
+        
+        // MARK: - WKNavigationDelegate Security & Monitoring
+        
+        /// Enforces strict navigation policies to prevent unauthorized external requests or script injection.
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.cancel)
+                return
+            }
+            
+            // Allow only local file URLs originating from the App Bundle
+            if url.isFileURL && url.path.hasPrefix(Bundle.main.bundlePath) {
+                decisionHandler(.allow)
+            } else {
+                trace("⚠️ Security Alert: Blocked unauthorized navigation attempt to \(url.absoluteString)")
+                decisionHandler(.cancel)
+            }
+        }
+        
+        /// Catches and logs errors during local provisional navigation.
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            trace("❌ WebView Error: Failed provisional navigation with error: \(error.localizedDescription)")
+        }
+        
+        /// Detects if the WebContent process crashes (e.g., due to memory pressure).
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            trace("💥 WebView Crash: The WebContent process terminated unexpectedly.")
+            parent.viewModel.handleProcessTermination()
         }
     }
 }

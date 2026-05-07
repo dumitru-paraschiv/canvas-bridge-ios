@@ -28,6 +28,15 @@ final class WebViewModel: ObservableObject {
     /// A trigger used to signal the UI layer to capture a snapshot.
     @Published var triggerSnapshot: Bool = false
     
+    /// Indicates if there was a connection or navigation error.
+    @Published var connectionError: String? = nil
+    
+    /// Indicates whether the WebContent process has crashed or terminated.
+    @Published var isProcessTerminated: Bool = false
+    
+    /// A trigger used to signal the UI layer to reload the canvas environment.
+    @Published var triggerReload: Bool = false
+    
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
     
@@ -123,6 +132,23 @@ final class WebViewModel: ObservableObject {
     func didCaptureSnapshot(_ image: UIImage) {
         snapshotImage = image
         triggerSnapshot = false
+    }
+    
+    // MARK: - Process Monitoring
+    
+    /// Called when the underlying WKWebView WebContent process unexpectedly terminates.
+    func handleProcessTermination() {
+        isCanvasReady = false
+        isProcessTerminated = true
+        connectionError = "The WebContent process terminated unexpectedly."
+        trace("🔄 Process Reset: Resetting canvas state due to termination. UI should attempt reload.")
+    }
+    
+    /// Sets a flag to trigger the UI layer to reload the pre-warmed WebView environment.
+    func reloadCanvas() {
+        isProcessTerminated = false
+        connectionError = nil
+        triggerReload = true
     }
     
     // MARK: - Outgoing Communication (Swift -> JS)
