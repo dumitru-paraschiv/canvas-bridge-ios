@@ -28,6 +28,7 @@ struct MainViewUI: View {
     }
     
     var body: some View {
-        Text("Main")
+        WebViewUI()
+            .ignoresSafeArea()
     }
 }
