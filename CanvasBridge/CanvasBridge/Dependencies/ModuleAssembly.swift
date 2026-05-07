@@ -6,6 +6,7 @@
 //
 
 import Swinject
+import CanvasBridgeCore
 
 final class ModuleAssembly: Assembly {
     
@@ -14,12 +15,13 @@ final class ModuleAssembly: Assembly {
             let viewModel = MainViewModel(
                 model: model
             )
-            let webViewModel = WebViewModel(
-                webViewService: r.resolve()
+            let engine = CanvasStateEngine(
+                storage: r.resolve()
             )
             let viewUI = MainViewUI(
                 viewModel: viewModel,
-                webViewModel: webViewModel
+                engine: engine,
+                webViewService: r.resolve()
             )
             let view = MainViewController(rootView: viewUI)
             viewModel.bind(output: view)

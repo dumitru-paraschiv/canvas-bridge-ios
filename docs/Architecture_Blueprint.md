@@ -15,21 +15,27 @@ Dependency injection is managed centrally using **Swinject**.
   - `ServiceAssembly`: Registers shared services and resource-heavy process managers. Notably, `WebViewService` is registered as a Singleton (`.container` scope) to ensure the web engine boots exactly once and is readily accessible to the Main module.
 - **Injection Flow**: When a Flow needs to navigate, it relies on Factory protocols (e.g., `ModuleFactory`, `FlowFactory`). It invokes a `make...()` function which queries the Swinject `Resolver` to construct the destination view hierarchy and inject its dependencies, passing it back to the Flow to be pushed onto the navigation stack.
 
+### 2.1 Module Segregation & Dependency Inversion
+To guarantee multiplatform readiness and testability, the application utilizes strict dependency inversion:
+- **Domain (CanvasBridgeCore)**: A pure Swift Package Manager module containing the `CanvasStateEngine`, JSON bridging models, and protocol definitions (e.g., `StorageProvider`). It has zero external dependencies (no UIKit, no WebKit).
+- **Infrastructure (iOS Services)**: Platform-specific implementations, such as `IOSStorageProvider` (utilizing iOS `FileManager`), conform to the core protocols and are injected at runtime via Swinject.
+- **UI (iOS)**: The SwiftUI views and UIKit controllers import `CanvasBridgeCore` and rely on the abstracted `CanvasStateEngine`.
+
 ## 3. Navigation Flow
 The app's startup routing follows this sequence:
 1. **SceneDelegate**: Intercepts app launch, configures the `UIWindow`, and instantiates the `DefaultAppFlow`.
 2. **AppFlow (Root Coordinator)**: In its `start()` method, it triggers the `showMainFlow()` routine.
 3. **MainFlow (Sub-Coordinator)**: Constructed and retained by `AppFlow`. Calling `start()` triggers `showMainView(with: MainModel())`.
-4. **MainModule Initialization**: The Swinject `ModuleAssembly` injects `MainModel` into `MainViewModel`, wraps the SwiftUI `MainViewUI` inside `MainViewController`, and binds their Combine pipelines.
+4. **MainModule Initialization**: The Swinject `ModuleAssembly` injects `MainModel` into `MainViewModel`, resolves the `StorageProvider`, injects it into `CanvasStateEngine`, wraps the SwiftUI `MainViewUI` inside `MainViewController`, and binds their Combine pipelines.
 5. **Display**: `MainViewController` (a `BaseHostingController`) is set as the root of the navigation stack, rendering the SwiftUI screen.
 
 ## 4. Web Module Architecture
-The bridge between the native iOS layer and the HTML5 Canvas relies on a strictly typed, unidirectional data flow governed by the `WebViewModel`.
-- **Single Source of Truth**: The `WebViewModel` acts as the definitive state engine for the web layer, ensuring consistency across the hybrid environment.
+The bridge between the native iOS layer and the HTML5 Canvas relies on a strictly typed, unidirectional data flow governed by the `CanvasStateEngine` (housed in `CanvasBridgeCore`).
+- **Single Source of Truth**: The `CanvasStateEngine` acts as the definitive state engine for the web layer, ensuring consistency across the hybrid environment.
 - **Strict Concurrency**: Annotated with `@MainActor`, it guarantees that all UI updates, state modifications, and JSON parsing occur safely on the main thread, adhering to modern Swift concurrency guidelines.
-- **State Tracking & History**: It actively monitors the canvas lifecycle (`isCanvasReady`) and user interaction history (e.g., `lastTappedCoordinates` for driving native haptics). It also manages transient states, such as `triggerSnapshot` and `snapshotImage`, to coordinate complex asynchronous operations.
+- **State Tracking & History**: It actively monitors the canvas lifecycle (`isCanvasReady`) and user interaction history (e.g., `lastTappedCoordinates` for driving native haptics). It also manages transient states, such as `triggerSnapshot` and `snapshotData`, to coordinate complex asynchronous operations.
 - **Centralized Dispatch**: All commands sent to the JavaScript environment are strictly modeled as generic `CanvasCommand` payloads and encoded/decoded centrally to prevent malformed data transactions.
-- **Asynchronous Snapshot Flow**: To export the canvas, the `WebViewModel` toggles a `triggerSnapshot` flag. The `WebViewUI` actively observes this state, invokes the native `WKWebView.takeSnapshot(with: nil)` API to capture the out-of-process web buffer, and asynchronously returns a native `UIImage` back to the ViewModel.
+- **Asynchronous Snapshot Flow**: To export the canvas, the `CanvasStateEngine` toggles a `triggerSnapshot` flag. The `WebViewUI` actively observes this state, invokes the native `WKWebView.takeSnapshot(with: nil)` API to capture the out-of-process web buffer as binary `Data`, and asynchronously returns it back to the engine.
 
 ## 5. JavaScript Engine
 The HTML5 web layer is not a static DOM tree, but a fully reactive rendering engine.
@@ -40,7 +46,7 @@ The HTML5 web layer is not a static DOM tree, but a fully reactive rendering eng
 ## 6. Presentation Layer & Integration Points
 To integrate the hybrid canvas into the native application:
 - **Core Wrapper**: The `WebViewUI` module (`CanvasBridge/CanvasBridge/Modules/Web/`) wraps `WKWebView` inside a `UIViewRepresentable`, suppressing native scrolling and applying transparency to blend perfectly with SwiftUI.
-- **CanvasToolbarUI**: A highly polished, glassmorphic SwiftUI component residing in the Main module. It utilizes a **Grouped Contextual Design**—segmented into distinct capsules for History, Creation, and Output—to optimize for HIG-compliant hit targets and information architecture. It observes the `WebViewModel` to dispatch commands down to the JavaScript engine and trigger native actions like snapshots.
+- **CanvasToolbarUI**: A highly polished, glassmorphic SwiftUI component residing in the Main module. It utilizes a **Grouped Contextual Design**—segmented into distinct capsules for History, Creation, and Output—to optimize for HIG-compliant hit targets and information architecture. It observes the `CanvasStateEngine` to dispatch commands down to the JavaScript engine and trigger native actions like snapshots.
 - **Assembly Registration**: The web dependencies and the Main module composition are wired together inside `ModuleAssembly.swift` to ensure dependency injection remains intact.
 
 ## 7. Service Layer & Pre-Warming
@@ -52,10 +58,10 @@ To eliminate latency and "white-flash" artifacts when loading the hybrid environ
 To ensure the hybrid environment is entirely sandboxed and resilient against both external threats and internal memory constraints:
 - **Local-Only Navigation Sandbox**: The `WKNavigationDelegate` strictly enforces a security policy that only permits navigation to local file URLs (`isFileURL`) originating from within the App Bundle. Any external links, redirects, or injected navigation attempts are aggressively intercepted and blocked, preventing unauthorized script execution.
 - **WebContent Crash Lifecycle**: The native iOS layer actively monitors the out-of-process WebContent renderer. If the process is terminated unexpectedly (e.g., due to system memory pressure), the `WKNavigationDelegate` catches the `webViewWebContentProcessDidTerminate` event. 
-- **Automated State Lockdown & Recovery Flow**: Upon detecting a crash, the `WebViewModel` immediately flags the `isProcessTerminated` state. This securely locks down the UI and mounts a polished "Recovery Overlay" within `MainViewUI`, intercepting user interactions. When the user initiates a refresh, the native layer invokes a hard `.reload()` on the `WKWebView` instance, seamlessly bootstrapping a fresh JavaScript rendering engine in the background without necessitating a full app restart.
-- **Advanced Jetsam Mitigation**: To proactively defend against silent OS terminations, the `WebViewModel` uses `Combine` to actively monitor `UIApplication.didReceiveMemoryWarningNotification`. Upon detecting high memory pressure, it translates this native OS warning into a cross-boundary `"system_warning"` command, instructing the out-of-process WebContent renderer to aggressively purge non-critical memory buffers (like history stacks) while preserving the user's visual state.
+- **Automated State Lockdown & Recovery Flow**: Upon detecting a crash, the `CanvasStateEngine` immediately flags the `isProcessTerminated` state. This securely locks down the UI and mounts a polished "Recovery Overlay" within `MainViewUI`, intercepting user interactions. When the user initiates a refresh, the native layer invokes a hard `.reload()` on the `WKWebView` instance, seamlessly bootstrapping a fresh JavaScript rendering engine in the background without necessitating a full app restart.
+- **Advanced Jetsam Mitigation**: To proactively defend against silent OS terminations, the SwiftUI view layer uses `Combine` to actively monitor `UIApplication.didReceiveMemoryWarningNotification`. Upon detecting high memory pressure, it instructs the `CanvasStateEngine` to trigger a memory purge. This translates into a cross-boundary `"system_warning"` command, instructing the out-of-process WebContent renderer to aggressively purge non-critical memory buffers (like history stacks) while preserving the user's visual state.
 
 ## 9. State Persistence & Hydration
 To ensure no data is lost during app terminations or process crashes, CanvasBridge implements a deterministic state hydration loop:
 - **Continuous Background Serialization**: The JavaScript engine acts as the active memory state. Every time a visual mutation occurs (e.g., drawing a shape, undoing an action), the JS engine emits a `sync_state` event containing its entire `shapes` array. The native Swift layer intercepts this and asynchronously encodes the array to binary JSON (`canvas_state.json`), writing it to the local `FileManager` disk without blocking the main UI thread.
-- **Cold-Boot Hydration**: When the application launches and the `WebViewService` pre-warms the engine, the `WKWebView` fires a `lifecycle: ready` event. The `WebViewModel` immediately triggers a hydration routine, reads `canvas_state.json` from disk, and dispatches a `hydrate_state` command back to the JS engine. The engine injects this binary state, instantly rebuilding the user's session with zero data loss.
+- **Cold-Boot Hydration**: When the application launches and the `WebViewService` pre-warms the engine, the `WKWebView` fires a `lifecycle: ready` event. The `CanvasStateEngine` immediately triggers a hydration routine, reads `canvas_state.json` from the abstracted `StorageProvider`, and dispatches a `hydrate_state` command back to the JS engine. The engine injects this binary state, instantly rebuilding the user's session with zero data loss.
