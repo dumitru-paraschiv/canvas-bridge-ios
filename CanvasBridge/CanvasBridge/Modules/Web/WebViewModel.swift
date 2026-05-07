@@ -7,7 +7,7 @@
 
 import Foundation
 import Combine
-import CoreGraphics
+import UIKit
 
 /// Manages the state and communication bridge between the native layer and the Web Canvas.
 @MainActor
@@ -21,6 +21,12 @@ final class WebViewModel: ObservableObject {
     
     /// Centralized binding to safely dispatch encoded JSON commands to the Web layer.
     @Published var outgoingCommand: String? = nil
+    
+    /// The latest captured snapshot of the canvas.
+    @Published var snapshotImage: UIImage? = nil
+    
+    /// A trigger used to signal the UI layer to capture a snapshot.
+    @Published var triggerSnapshot: Bool = false
     
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
@@ -100,6 +106,19 @@ final class WebViewModel: ObservableObject {
         let payload = ColorPayload(hexCode: hex)
         let command = CanvasCommand(action: "change_color", payload: payload)
         outgoingCommand = generateCommandString(for: command)
+    }
+    
+    // MARK: - Snapshot Handling
+    
+    /// Triggers the UI to capture a snapshot of the canvas.
+    func requestSnapshot() {
+        triggerSnapshot = true
+    }
+    
+    /// Called by the UI layer when a snapshot is successfully captured.
+    func didCaptureSnapshot(_ image: UIImage) {
+        snapshotImage = image
+        triggerSnapshot = false
     }
     
     // MARK: - Outgoing Communication (Swift -> JS)

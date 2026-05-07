@@ -24,73 +24,90 @@ struct CanvasToolbarUI: View {
     @State private var colorIndex = 0
     
     var body: some View {
-        HStack(spacing: 22) {
-            // Undo Button
-            Button {
-                viewModel.undo()
-            } label: {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.title2)
+        HStack(spacing: 8) {
+            
+            // MARK: - Group 1: History
+            HStack(spacing: 16) {
+                Button {
+                    viewModel.undo()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .disabled(!viewModel.isCanvasReady)
+                
+                Button {
+                    viewModel.redo()
+                } label: {
+                    Image(systemName: "arrow.uturn.forward")
+                }
+                .disabled(!viewModel.isCanvasReady)
             }
-            .disabled(!viewModel.isCanvasReady)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             
-            // Redo Button
-            Button {
-                viewModel.redo()
-            } label: {
-                Image(systemName: "arrow.uturn.forward")
-                    .font(.title2)
+            Spacer(minLength: 0)
+            
+            // MARK: - Group 2: Creation & Tooling
+            HStack(spacing: 20) {
+                Button {
+                    viewModel.addShape(type: "rect", color: shapeColorsHex[colorIndex])
+                } label: {
+                    Image(systemName: "square.fill")
+                        .foregroundColor(shapeColors[colorIndex])
+                }
+                
+                Button {
+                    viewModel.addShape(type: "circle", color: shapeColorsHex[colorIndex])
+                } label: {
+                    Image(systemName: "circle.fill")
+                        .foregroundColor(shapeColors[colorIndex])
+                }
+                
+                Button {
+                    colorIndex = (colorIndex + 1) % shapeColorsHex.count
+                    viewModel.updateColor(hex: shapeColorsHex[colorIndex])
+                } label: {
+                    Image(systemName: "paintpalette")
+                        .foregroundColor(shapeColors[colorIndex])
+                }
             }
-            .disabled(!viewModel.isCanvasReady)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             
-            Divider()
-                .frame(height: 24)
+            Spacer(minLength: 0)
             
-            // Add Square Button
-            Button {
-                viewModel.addShape(type: "rect", color: shapeColorsHex[colorIndex])
-            } label: {
-                Image(systemName: "square.fill")
-                    .font(.title2)
-                    .foregroundColor(shapeColors[colorIndex])
+            // MARK: - Group 3: Destructive / Export Actions
+            HStack(spacing: 16) {
+                Button {
+                    viewModel.requestSnapshot()
+                } label: {
+                    Image(systemName: "camera.viewfinder")
+                }
+                .disabled(!viewModel.isCanvasReady)
+                
+                Button {
+                    viewModel.clear()
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                }
+                .disabled(!viewModel.isCanvasReady)
             }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             
-            // Add Circle Button
-            Button {
-                viewModel.addShape(type: "circle", color: shapeColorsHex[colorIndex])
-            } label: {
-                Image(systemName: "circle.fill")
-                    .font(.title2)
-                    .foregroundColor(shapeColors[colorIndex])
-            }
-            
-            Divider()
-                .frame(height: 24)
-            
-            // Color Toggle Button
-            Button {
-                colorIndex = (colorIndex + 1) % shapeColorsHex.count
-                viewModel.updateColor(hex: shapeColorsHex[colorIndex])
-            } label: {
-                Image(systemName: "paintpalette")
-                    .font(.title2)
-                    .foregroundColor(shapeColors[colorIndex])
-            }
-            
-            // Clear Button
-            Button {
-                viewModel.clear()
-            } label: {
-                Image(systemName: "trash")
-                    .font(.title2)
-                    .foregroundColor(.red)
-            }
-            .disabled(!viewModel.isCanvasReady)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .background(.ultraThinMaterial)
-        .clipShape(.capsule)
-        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+        .controlSize(.regular)
+        .font(.title3) // Standardize icon sizes across the toolbar
+        .padding(.horizontal, 16) // Prevent the grouped capsules from touching screen edges
     }
 }
