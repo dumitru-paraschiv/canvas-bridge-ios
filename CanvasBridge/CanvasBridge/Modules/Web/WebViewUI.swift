@@ -72,6 +72,16 @@ struct WebViewUI: UIViewRepresentable {
                 }
             }
         }
+        
+        // Handle Reload Requests
+        if viewModel.triggerReload {
+            trace("🔄 WebViewUI: Executing WKWebView reload to recover WebContent process.")
+            uiView.reload()
+            
+            Task { @MainActor in
+                self.viewModel.triggerReload = false
+            }
+        }
     }
     
     // MARK: - Coordinator (WKScriptMessageHandler)
