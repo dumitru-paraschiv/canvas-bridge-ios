@@ -11,6 +11,11 @@ import WebKit
 @MainActor
 struct WebViewUI: UIViewRepresentable {
     
+    // MARK: - Properties
+    
+    @ObservedObject var viewModel: WebViewModel
+    @Binding var outgoingCommand: String?
+    
     // MARK: - Coordinator Setup
     
     func makeCoordinator() -> Coordinator {
@@ -50,7 +55,20 @@ struct WebViewUI: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        // No dynamic updates required for the initial implementation
+        // Handle Swift-to-JS commands
+        if let command = outgoingCommand {
+            // Evaluate the JS function with the stringified JSON payload
+            uiView.evaluateJavaScript("window.updateCanvasState('\(command)')") { _, error in
+                if let error = error {
+                    trace("⚠️ JS Evaluation Error: \(error.localizedDescription)")
+                }
+            }
+            
+            // Asynchronously reset the binding on the MainActor to prevent duplicate execution
+            Task { @MainActor in
+                self.outgoingCommand = nil
+            }
+        }
     }
     
     // MARK: - Coordinator (WKScriptMessageHandler)
@@ -67,7 +85,12 @@ struct WebViewUI: UIViewRepresentable {
         /// Intercepts messages sent from the JavaScript environment.
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "canvasBridge" {
-                trace("🌐 Received message: \(message.body)")
+                if let payloadString = message.body as? String {
+                    // Route the string payload to the ViewModel for decoding and state updates
+                    parent.viewModel.handleIncomingMessage(payloadString)
+                } else {
+                    trace("⚠️ Received message body is not a String: \(message.body)")
+                }
             }
         }
     }

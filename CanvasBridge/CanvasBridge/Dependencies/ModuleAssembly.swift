@@ -14,7 +14,11 @@ final class ModuleAssembly: Assembly {
             let viewModel = MainViewModel(
                 model: model
             )
-            let viewUI = MainViewUI(viewModel: viewModel)
+            let webViewModel = WebViewModel()
+            let viewUI = MainViewUI(
+                viewModel: viewModel,
+                webViewModel: webViewModel
+            )
             let view = MainViewController(rootView: viewUI)
             viewModel.bind(output: view)
             view.viewModel = viewModel

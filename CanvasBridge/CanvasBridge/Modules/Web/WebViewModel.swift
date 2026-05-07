@@ -7,19 +7,7 @@
 
 import Foundation
 import Combine
-
-/// Errors that can occur within the Web Bridge communication.
-enum WebBridgeError: Error, LocalizedError {
-    
-    case stringConversionFailed
-    
-    var errorDescription: String? {
-        switch self {
-        case .stringConversionFailed:
-            return "Failed to convert encoded JSON data to a UTF-8 String."
-        }
-    }
-}
+import CoreGraphics
 
 /// Manages the state and communication bridge between the native layer and the Web Canvas.
 @MainActor
@@ -28,8 +16,8 @@ final class WebViewModel: ObservableObject {
     /// Indicates whether the web canvas has finished initializing and is ready to receive commands.
     @Published var isCanvasReady: Bool = false
     
-    /// Stores the ID of the last node the user interacted with on the canvas.
-    @Published var lastTappedNode: String? = nil
+    /// Stores the exact coordinates of the user's last interaction with the canvas.
+    @Published var lastTappedCoordinates: CGPoint? = nil
     
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
@@ -44,7 +32,7 @@ final class WebViewModel: ObservableObject {
     /// - Parameter jsonString: The raw JSON string received from WKScriptMessageHandler.
     func handleIncomingMessage(_ jsonString: String) {
         guard let data = jsonString.data(using: .utf8) else {
-            trace("⚠️ [WebViewModel] Failed to convert incoming string to Data.")
+            trace("⚠️ Error: Failed to convert incoming string to UTF-8 Data.")
             return
         }
         
@@ -52,7 +40,10 @@ final class WebViewModel: ObservableObject {
             let event = try decoder.decode(CanvasEvent.self, from: data)
             processEvent(event)
         } catch {
-            trace("⚠️ [WebViewModel] Failed to decode CanvasEvent: \(error)")
+            trace("❌ Decoding Error: Failed to decode CanvasEvent from JSON.")
+            trace("   JSON Payload: \(jsonString)")
+            trace("   Underlying Error: \(error.localizedDescription)")
+            trace("   Detailed Error: \(error)") // Useful for debugging specific key mismatches
         }
     }
     
@@ -62,15 +53,15 @@ final class WebViewModel: ObservableObject {
         case let .lifecycle(status):
             if status == "initialized" || status == "ready" {
                 isCanvasReady = true
-                print("✅ [WebViewModel] Canvas is ready.")
+                trace("✅ Canvas Lifecycle: Status is '\(status)'. Bridge is ready.")
+            } else {
+                trace("ℹ️ Canvas Lifecycle Update: \(status)")
             }
             
-        case let .userInteraction(nodeID, x, y):
-            lastTappedNode = nodeID
-            trace("👆 [WebViewModel] User interacted with node '\(nodeID)' at (\(x), \(y)).")
-            
-        case let .unknown(eventType):
-            trace("❓ [WebViewModel] Received unknown event type: \(eventType)")
+        case let .interaction(type, nodeId, x, y):
+            let point = CGPoint(x: x, y: y)
+            lastTappedCoordinates = point
+            trace("👆 Canvas Interaction: User performed '\(type)' on node '\(nodeId)' at \(point).")
         }
     }
     
@@ -78,13 +69,21 @@ final class WebViewModel: ObservableObject {
     
     /// Encodes a command into a JSON string to be sent to the Web Canvas.
     /// - Parameter command: The strongly-typed CanvasCommand to send.
-    /// - Returns: A JSON string representation of the command.
-    func generateCommandString<T: Encodable>(for command: CanvasCommand<T>) throws -> String {
-        let data = try encoder.encode(command)
-        guard let jsonString = String(data: data, encoding: .utf8) else {
-            throw WebBridgeError.stringConversionFailed
+    /// - Returns: A JSON string representation of the command, or nil if encoding fails.
+    func generateCommandString<T: Encodable>(for command: CanvasCommand<T>) -> String? {
+        do {
+            let data = try encoder.encode(command)
+            guard let jsonString = String(data: data, encoding: .utf8) else {
+                trace("⚠️ Encoding Error: Failed to convert encoded JSON data to a UTF-8 String.")
+                return nil
+            }
+            return jsonString
+        } catch {
+            trace("❌ Encoding Error: Failed to encode CanvasCommand into JSON.")
+            trace("   Command Action: \(command.action)")
+            trace("   Underlying Error: \(error.localizedDescription)")
+            trace("   Detailed Error: \(error)")
+            return nil
         }
-        
-        return jsonString
     }
 }

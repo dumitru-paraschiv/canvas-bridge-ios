@@ -7,83 +7,130 @@
 
 import Foundation
 
-// MARK: - Incoming (JS to Swift)
+// MARK: - Incoming Communication (JS to Swift)
 
-/// Represents events sent from the Web Canvas to the Swift native layer.
+/// Represents events sent from the Web Canvas layer up to the Swift native layer.
+/// This enum strictly defines the expected structure of incoming messages,
+/// ensuring robust, type-safe, and predictable communication across the bridge.
 enum CanvasEvent: Decodable {
-    case lifecycle(status: String)
-    case userInteraction(nodeID: String, x: Double, y: Double)
-    case unknown(String)
     
-    private enum CodingKeys: String, CodingKey {
+    /// Triggered during the initialization phase of the web canvas.
+    /// - Parameter status: A string indicating the current status (e.g., "ready").
+    case lifecycle(status: String)
+    
+    /// Triggered when the user interacts with the web canvas.
+    /// - Parameters:
+    ///   - type: The specific type of interaction (e.g., "tap", "drag", "hover").
+    ///   - nodeId: The unique identifier of the interacted node or element on the canvas.
+    ///   - x: The precise horizontal coordinate of the interaction relative to the canvas origin.
+    ///   - y: The precise vertical coordinate of the interaction relative to the canvas origin.
+    case interaction(type: String, nodeId: String, x: Double, y: Double)
+    
+    /// Keys used to decode the outer envelope of the incoming JSON message.
+    private enum EnvelopeKeys: String, CodingKey {
         case event
         case payload
     }
     
-    // Nested structs for expected payloads to assist with decoding
-    private struct LifecyclePayload: Decodable {
-        let status: String
+    /// Keys used to decode the payload of a lifecycle event.
+    private enum LifecyclePayloadKeys: String, CodingKey {
+        case status
     }
     
-    private struct UserInteractionPayload: Decodable {
-        let nodeID: String
-        let x: Double
-        let y: Double
-        
-        enum CodingKeys: String, CodingKey {
-            case nodeID = "node_id"
-            case x
-            case y
-        }
+    /// Keys used to decode the payload of an interaction event.
+    private enum InteractionPayloadKeys: String, CodingKey {
+        case type
+        case nodeId = "node_id" // Maps the JS snake_case key to Swift camelCase
+        case x
+        case y
     }
     
+    // MARK: - Decodable Implementation
+    
+    /// Custom initializer to parse the incoming JSON envelope and decode the appropriate payload
+    /// based on the `event` key.
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let eventType = try container.decode(String.self, forKey: .event)
+        // First, extract the outer envelope container
+        let envelopeContainer = try decoder.container(keyedBy: EnvelopeKeys.self)
+        
+        // Decode the primary event type to determine how to parse the payload
+        let eventType = try envelopeContainer.decode(String.self, forKey: .event)
         
         switch eventType {
         case "lifecycle":
-            let payload = try container.decode(LifecyclePayload.self, forKey: .payload)
-            self = .lifecycle(status: payload.status)
+            // Access the nested payload object for lifecycle events
+            let payloadContainer = try envelopeContainer.nestedContainer(keyedBy: LifecyclePayloadKeys.self, forKey: .payload)
+            let status = try payloadContainer.decode(String.self, forKey: .status)
+            self = .lifecycle(status: status)
             
         case "user_interaction":
-            let payload = try container.decode(UserInteractionPayload.self, forKey: .payload)
-            self = .userInteraction(nodeID: payload.nodeID, x: payload.x, y: payload.y)
+            // Access the nested payload object for interaction events
+            let payloadContainer = try envelopeContainer.nestedContainer(keyedBy: InteractionPayloadKeys.self, forKey: .payload)
+            let type = try payloadContainer.decode(String.self, forKey: .type)
+            let nodeId = try payloadContainer.decode(String.self, forKey: .nodeId)
+            let x = try payloadContainer.decode(Double.self, forKey: .x)
+            let y = try payloadContainer.decode(Double.self, forKey: .y)
+            self = .interaction(type: type, nodeId: nodeId, x: x, y: y)
             
         default:
-            self = .unknown(eventType)
+            // For strict typing in a production environment, throw an error on unknown events
+            // to ensure the bridge protocol remains synchronized between JS and Swift.
+            throw DecodingError.dataCorruptedError(
+                forKey: .event,
+                in: envelopeContainer,
+                debugDescription: "Unknown or unsupported event type: \(eventType)"
+            )
         }
     }
 }
 
-// MARK: - Outgoing (Swift to JS)
+// MARK: - Outgoing Communication (Swift to JS)
 
-/// An envelope for sending commands from the Swift native layer to the Web Canvas.
+/// A strictly typed envelope for sending commands from the native Swift layer down to the Web Canvas.
+/// By utilizing generics, this struct ensures that any payload sent conforms to standard Encodable requirements.
 struct CanvasCommand<T: Encodable>: Encodable {
+    
+    /// The specific action identifier the web layer should execute (e.g., "draw_shape", "clear_canvas").
     let action: String
+    
+    /// The associated data model required to execute the specified action.
     let payload: T
 }
 
-// MARK: Command Payloads
+// MARK: - Command Payloads
 
+/// Defines the payload required to draw a sophisticated, geometric shape on the canvas.
+/// This acts as the data transfer object for rendering directives.
 struct DrawShapePayload: Encodable {
-    let shapeType: String
-    let color: String
+    
+    /// A unique identifier for the shape, useful for future manipulations, state tracking, or hit testing.
+    let id: String
+    
+    /// The geometric classification of the shape (e.g., "rect", "circle", "rounded_rect").
+    let type: String
+    
+    /// The absolute horizontal starting coordinate of the shape on the canvas.
     let x: Double
+    
+    /// The absolute vertical starting coordinate of the shape on the canvas.
     let y: Double
+    
+    /// The total width of the shape.
     let width: Double
+    
+    /// The total height of the shape.
     let height: Double
     
-    enum CodingKeys: String, CodingKey {
-        case shapeType = "shape_type"
-        case color
-        case x
-        case y
-        case width
-        case height
-    }
+    /// The fill color of the shape, represented as a standard CSS hex string (e.g., "#FF0000").
+    let color: String
+    
+    /// The corner radius for rounded shapes. Used extensively for modern UI components.
+    let cornerRadius: Double
 }
 
+/// Defines the payload required to clear the canvas environment entirely.
 struct ClearCanvasPayload: Encodable {
+    
+    /// Specifies whether the clearing action should be smoothly animated (e.g., a fade out) or instantaneous.
     let animated: Bool
 }
