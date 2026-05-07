@@ -21,13 +21,31 @@ final class MainViewController: BaseHostingController<MainViewUI>, MainView {
 
 struct MainViewUI: View {
     
-    @ObservedObject private var viewModel: MainViewModel
-    
-    init(viewModel: MainViewModel) {
-        self.viewModel = viewModel
-    }
+    @ObservedObject var viewModel: MainViewModel
+    @ObservedObject var webViewModel: WebViewModel
     
     var body: some View {
-        Text("Main")
+        ZStack {
+            // Background
+            Color.black
+                .ignoresSafeArea()
+            
+            // Bridge Layer
+            WebViewUI(viewModel: webViewModel, outgoingCommand: $webViewModel.outgoingCommand)
+                .ignoresSafeArea()
+            
+            // Overlay Controls
+            VStack {
+                Spacer()
+                
+                CanvasToolbarUI(viewModel: webViewModel)
+                    .padding(.bottom, 40)
+            }
+        }
+        // Native Haptic Feedback for Web Canvas Interactions
+        .onChange(of: webViewModel.lastTappedCoordinates) { _ in
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        }
     }
 }

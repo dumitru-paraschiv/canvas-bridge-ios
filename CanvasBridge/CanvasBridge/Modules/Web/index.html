@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Canvas Bridge</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            /* Prevent scrolling */
+            background-color: #000;
+            /* Default fallback background */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            /* Ensure the canvas is easily tappable */
+            touch-action: none;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="appCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('appCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 1. State Management
+        let shapes = [];
+        let undoStack = [];
+        let redoStack = [];
+        let currentColor = '#FFFFFF';
+
+        // Canvas Setup and Crisp Rendering
+        function resizeCanvas() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            // Account for Retina displays
+            const dpr = window.devicePixelRatio || 1;
+
+            // Set actual size in memory (scaled to account for extra pixel density)
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+
+            // Normalize coordinate system to use css pixels
+            ctx.scale(dpr, dpr);
+
+            // Set CSS size
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+
+            redraw();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // JS -> Swift (Events)
+        function sendMessageToSwift(event, payload) {
+            try {
+                // Envelope pattern
+                const message = JSON.stringify({ event: event, payload: payload });
+
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.canvasBridge) {
+                    window.webkit.messageHandlers.canvasBridge.postMessage(message);
+                } else {
+                    console.log("Swift Bridge not available. Message:", message);
+                }
+            } catch (error) {
+                console.error("Error sending message to Swift:", error);
+            }
+        }
+
+        // Lifecycle Event
+        window.addEventListener('load', () => {
+            sendMessageToSwift("lifecycle", { status: "ready" });
+        });
+
+        // Interaction Event
+        canvas.addEventListener('pointerdown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            // Calculate exact CSS coordinates relative to the canvas
+            const tapX = e.clientX - rect.left;
+            const tapY = e.clientY - rect.top;
+
+            sendMessageToSwift("user_interaction", {
+                type: "tap",
+                node_id: "canvas_root", // Use node_id to match Swift WebModels CodingKeys
+                x: tapX,
+                y: tapY
+            });
+        });
+
+        function drawRoundedRect(x, y, w, h, r, color) {
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(x, y, w, h, r);
+            } else {
+                // Fallback for older WebKit versions
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + w - r, y);
+                ctx.arcTo(x + w, y, x + w, y + r, r);
+                ctx.lineTo(x + w, y + h - r);
+                ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+                ctx.lineTo(x + r, y + h);
+                ctx.arcTo(x, y + h, x, y + h - r, r);
+                ctx.lineTo(x, y + r);
+                ctx.arcTo(x, y, x + r, y, r);
+            }
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        // 2. Render Loop
+        function redraw() {
+            // Clear canvas entirely
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+            // Iterate and draw all stored shapes
+            for (const shape of shapes) {
+                const color = shape.color || currentColor;
+                const width = shape.width || shape.size || 50;
+                const height = shape.height || shape.size || 50;
+
+                if (shape.type === 'rect') {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(shape.x, shape.y, width, height);
+                } else if (shape.type === 'circle') {
+                    ctx.beginPath();
+                    const radius = width / 2;
+                    ctx.arc(shape.x, shape.y, radius, 0, 2 * Math.PI);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                } else if (shape.type === 'rounded_rect') {
+                    const r = shape.cornerRadius || 0;
+                    drawRoundedRect(shape.x, shape.y, width, height, r, color);
+                }
+            }
+        }
+
+        // History Helper
+        function saveStateToUndo() {
+            // Deep copy the current shapes array to the undo stack
+            undoStack.push(JSON.parse(JSON.stringify(shapes)));
+            // Clears redo stack when a new action is performed
+            redoStack = [];
+        }
+
+        // 3. Swift -> JS (Commands)
+        window.updateCanvasState = function (jsonString) {
+            try {
+                const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+                const action = data.action;
+                const p = data.payload;
+
+                if (action === "add_shape" || action === "draw_shape") {
+                    saveStateToUndo();
+                    shapes.push(p);
+                    redraw();
+                } else if (action === "clear_canvas") {
+                    saveStateToUndo();
+                    shapes = [];
+                    redraw();
+                } else if (action === "undo") {
+                    if (undoStack.length > 0) {
+                        redoStack.push(JSON.parse(JSON.stringify(shapes)));
+                        shapes = undoStack.pop();
+                        redraw();
+                    }
+                } else if (action === "redo") {
+                    if (redoStack.length > 0) {
+                        undoStack.push(JSON.parse(JSON.stringify(shapes)));
+                        shapes = redoStack.pop();
+                        redraw();
+                    }
+                } else if (action === "change_color") {
+                    if (p && p.hexCode) {
+                        currentColor = p.hexCode;
+                    }
+                }
+            } catch (error) {
+                console.error("Error parsing JSON from Swift:", error);
+            }
+        };
+
+        // Initialize display
+        resizeCanvas();
+    </script>
+</body>
+
+</html>

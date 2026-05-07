@@ -7,7 +7,7 @@
 
 import Combine
 
-protocol MainFlow: Flow {
+protocol MainFlow: NavigationFlow {
     
 }
 
