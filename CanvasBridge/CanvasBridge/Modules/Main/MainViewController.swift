@@ -38,6 +38,46 @@ struct MainViewUI: View {
             )
                 .ignoresSafeArea()
             
+            // Process Recovery Overlay
+            if webViewModel.isProcessTerminated {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.orange)
+                    
+                    Text("Canvas Unresponsive")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    
+                    if let error = webViewModel.connectionError {
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    
+                    Button(action: {
+                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                        generator.impactOccurred()
+                        webViewModel.reloadCanvas()
+                    }) {
+                        Text("Refresh Engine")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color.blue)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(32)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+            }
+            
             // Overlay Controls
             VStack {
                 Spacer()
