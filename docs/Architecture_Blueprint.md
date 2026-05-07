@@ -27,8 +27,9 @@ The app's startup routing follows this sequence:
 The bridge between the native iOS layer and the HTML5 Canvas relies on a strictly typed, unidirectional data flow governed by the `WebViewModel`.
 - **Single Source of Truth**: The `WebViewModel` acts as the definitive state engine for the web layer, ensuring consistency across the hybrid environment.
 - **Strict Concurrency**: Annotated with `@MainActor`, it guarantees that all UI updates, state modifications, and JSON parsing occur safely on the main thread, adhering to modern Swift concurrency guidelines.
-- **State Tracking & History**: It actively monitors the canvas lifecycle (`isCanvasReady`) and user interaction history (e.g., `lastTappedCoordinates` for driving native haptics).
+- **State Tracking & History**: It actively monitors the canvas lifecycle (`isCanvasReady`) and user interaction history (e.g., `lastTappedCoordinates` for driving native haptics). It also manages transient states, such as `triggerSnapshot` and `snapshotImage`, to coordinate complex asynchronous operations.
 - **Centralized Dispatch**: All commands sent to the JavaScript environment are strictly modeled as generic `CanvasCommand` payloads and encoded/decoded centrally to prevent malformed data transactions.
+- **Asynchronous Snapshot Flow**: To export the canvas, the `WebViewModel` toggles a `triggerSnapshot` flag. The `WebViewUI` actively observes this state, invokes the native `WKWebView.takeSnapshot(with: nil)` API to capture the out-of-process web buffer, and asynchronously returns a native `UIImage` back to the ViewModel.
 
 ## 5. JavaScript Engine
 The HTML5 web layer is not a static DOM tree, but a fully reactive rendering engine.
@@ -39,5 +40,5 @@ The HTML5 web layer is not a static DOM tree, but a fully reactive rendering eng
 ## 6. Presentation Layer & Integration Points
 To integrate the hybrid canvas into the native application:
 - **Core Wrapper**: The `WebViewUI` module (`CanvasBridge/CanvasBridge/Modules/Web/`) wraps `WKWebView` inside a `UIViewRepresentable`, suppressing native scrolling and applying transparency to blend perfectly with SwiftUI.
-- **CanvasToolbarUI**: A decoupled, highly polished, glassmorphic SwiftUI component residing in the Main module. It acts as the primary control surface overlaid on the canvas. It observes the `WebViewModel` to dispatch commands (like adding shapes) down to the JavaScript engine.
+- **CanvasToolbarUI**: A highly polished, glassmorphic SwiftUI component residing in the Main module. It utilizes a **Grouped Contextual Design**—segmented into distinct capsules for History, Creation, and Output—to optimize for HIG-compliant hit targets and information architecture. It observes the `WebViewModel` to dispatch commands down to the JavaScript engine and trigger native actions like snapshots.
 - **Assembly Registration**: The web dependencies and the Main module composition are wired together inside `ModuleAssembly.swift` to ensure dependency injection remains intact.
