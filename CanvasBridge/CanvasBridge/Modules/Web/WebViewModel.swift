@@ -40,10 +40,18 @@ final class WebViewModel: ObservableObject {
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
     
+    private var cancellables = Set<AnyCancellable>()
+    
     let webViewService: WebViewService
     
     init(webViewService: WebViewService) {
         self.webViewService = webViewService
+        
+        NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)
+            .sink { [weak self] _ in
+                self?.handleMemoryWarning()
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Incoming Communication (JS -> Swift)
@@ -149,6 +157,16 @@ final class WebViewModel: ObservableObject {
         isProcessTerminated = false
         connectionError = nil
         triggerReload = true
+    }
+    
+    // MARK: - Jetsam Mitigation
+    
+    /// Triggered natively by iOS during memory pressure. Instructs the JS layer to purge non-critical memory.
+    private func handleMemoryWarning() {
+        trace("⚠️ Jetsam Mitigation: Emitting PURGE_HISTORY to WebContent process")
+        let payload = SystemWarningPayload(instruction: "purge_history")
+        let command = CanvasCommand(action: "system_warning", payload: payload)
+        outgoingCommand = generateCommandString(for: command)
     }
     
     // MARK: - Outgoing Communication (Swift -> JS)

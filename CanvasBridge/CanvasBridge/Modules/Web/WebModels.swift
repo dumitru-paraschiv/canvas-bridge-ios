@@ -104,6 +104,7 @@ struct EmptyPayload: Encodable {}
 
 /// Defines the payload required to add a standard geometric shape to the canvas history.
 struct AddShapePayload: Encodable {
+    
     let id: String
     let type: String
     let x: Double
@@ -114,11 +115,13 @@ struct AddShapePayload: Encodable {
 
 /// Defines the payload required to update the color context within the canvas engine.
 struct ColorPayload: Encodable {
+
     let hexCode: String
 }
 
 /// Defines the payload required to draw a sophisticated, geometric shape directly (legacy).
 struct DrawShapePayload: Encodable {
+
     let id: String
     let type: String
     let x: Double
@@ -131,5 +134,12 @@ struct DrawShapePayload: Encodable {
 
 /// Defines the payload required to clear the canvas environment entirely.
 struct ClearCanvasPayload: Encodable {
+
     let animated: Bool
+}
+
+/// Defines the payload required to instruct the web layer to perform system-level operations.
+struct SystemWarningPayload: Encodable {
+
+    let instruction: String
 }

@@ -33,6 +33,11 @@ Sent via `window.updateCanvasState(jsonString)`.
   - **Description**: Wipes all current shapes from the canvas state.
   - **Payload**: None required (or `EmptyPayload`).
 
+**System Group**
+- **`system_warning`**
+  - **Description**: Instructs the web engine to perform system-level operations, such as garbage collection during memory pressure.
+  - **Payload**: `{ instruction: String }` (e.g., `"purge_history"`).
+
 ### 2. JS to Swift (Events)
 Sent via `window.webkit.messageHandlers.canvasBridge.postMessage(jsonString)`.
 * `event`: String identifying the lifecycle or interaction event.
