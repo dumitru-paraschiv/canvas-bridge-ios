@@ -35,6 +35,12 @@
         const canvas = document.getElementById('appCanvas');
         const ctx = canvas.getContext('2d');
 
+        // 1. State Management
+        let shapes = [];
+        let undoStack = [];
+        let redoStack = [];
+        let currentColor = '#FFFFFF';
+
         // Canvas Setup and Crisp Rendering
         function resizeCanvas() {
             const width = window.innerWidth;
@@ -53,12 +59,13 @@
             // Set CSS size
             canvas.style.width = width + 'px';
             canvas.style.height = height + 'px';
+
+            redraw();
         }
 
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
 
-        // 1. JS -> Swift (Events)
+        // JS -> Swift (Events)
         function sendMessageToSwift(event, payload) {
             try {
                 // Envelope pattern
@@ -74,12 +81,12 @@
             }
         }
 
-        // 2. Lifecycle Event
+        // Lifecycle Event
         window.addEventListener('load', () => {
             sendMessageToSwift("lifecycle", { status: "ready" });
         });
 
-        // 3. Interaction Event
+        // Interaction Event
         canvas.addEventListener('pointerdown', (e) => {
             const rect = canvas.getBoundingClientRect();
             // Calculate exact CSS coordinates relative to the canvas
@@ -94,7 +101,6 @@
             });
         });
 
-        // Helper to draw a rounded rectangle
         function drawRoundedRect(x, y, w, h, r, color) {
             ctx.beginPath();
             if (ctx.roundRect) {
@@ -116,22 +122,80 @@
             ctx.fill();
         }
 
-        // 4. Swift -> JS (Commands)
+        // 2. Render Loop
+        function redraw() {
+            // Clear canvas entirely
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+            // Iterate and draw all stored shapes
+            for (const shape of shapes) {
+                const color = shape.color || currentColor;
+                const width = shape.width || shape.size || 50;
+                const height = shape.height || shape.size || 50;
+
+                if (shape.type === 'rect') {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(shape.x, shape.y, width, height);
+                } else if (shape.type === 'circle') {
+                    ctx.beginPath();
+                    const radius = width / 2;
+                    ctx.arc(shape.x, shape.y, radius, 0, 2 * Math.PI);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                } else if (shape.type === 'rounded_rect') {
+                    const r = shape.cornerRadius || 0;
+                    drawRoundedRect(shape.x, shape.y, width, height, r, color);
+                }
+            }
+        }
+
+        // History Helper
+        function saveStateToUndo() {
+            // Deep copy the current shapes array to the undo stack
+            undoStack.push(JSON.parse(JSON.stringify(shapes)));
+            // Clears redo stack when a new action is performed
+            redoStack = [];
+        }
+
+        // 3. Swift -> JS (Commands)
         window.updateCanvasState = function (jsonString) {
             try {
                 const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+                const action = data.action;
+                const p = data.payload;
 
-                if (data.action === "draw_shape") {
-                    const p = data.payload;
-                    const r = p.cornerRadius || 0;
-                    drawRoundedRect(p.x, p.y, p.width, p.height, r, p.color);
-                } else if (data.action === "clear_canvas") {
-                    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+                if (action === "add_shape" || action === "draw_shape") {
+                    saveStateToUndo();
+                    shapes.push(p);
+                    redraw();
+                } else if (action === "clear_canvas") {
+                    saveStateToUndo();
+                    shapes = [];
+                    redraw();
+                } else if (action === "undo") {
+                    if (undoStack.length > 0) {
+                        redoStack.push(JSON.parse(JSON.stringify(shapes)));
+                        shapes = undoStack.pop();
+                        redraw();
+                    }
+                } else if (action === "redo") {
+                    if (redoStack.length > 0) {
+                        undoStack.push(JSON.parse(JSON.stringify(shapes)));
+                        shapes = redoStack.pop();
+                        redraw();
+                    }
+                } else if (action === "change_color") {
+                    if (p && p.hexCode) {
+                        currentColor = p.hexCode;
+                    }
                 }
             } catch (error) {
                 console.error("Error parsing JSON from Swift:", error);
             }
         };
+
+        // Initialize display
+        resizeCanvas();
     </script>
 </body>
 

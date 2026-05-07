@@ -90,7 +90,7 @@ enum CanvasEvent: Decodable {
 /// By utilizing generics, this struct ensures that any payload sent conforms to standard Encodable requirements.
 struct CanvasCommand<T: Encodable>: Encodable {
     
-    /// The specific action identifier the web layer should execute (e.g., "draw_shape", "clear_canvas").
+    /// The specific action identifier the web layer should execute (e.g., "add_shape", "clear_canvas").
     let action: String
     
     /// The associated data model required to execute the specified action.
@@ -99,38 +99,37 @@ struct CanvasCommand<T: Encodable>: Encodable {
 
 // MARK: - Command Payloads
 
-/// Defines the payload required to draw a sophisticated, geometric shape on the canvas.
-/// This acts as the data transfer object for rendering directives.
-struct DrawShapePayload: Encodable {
-    
-    /// A unique identifier for the shape, useful for future manipulations, state tracking, or hit testing.
+/// Represents an empty payload for commands that require no parameters (e.g., undo, redo).
+struct EmptyPayload: Encodable {}
+
+/// Defines the payload required to add a standard geometric shape to the canvas history.
+struct AddShapePayload: Encodable {
     let id: String
-    
-    /// The geometric classification of the shape (e.g., "rect", "circle", "rounded_rect").
     let type: String
-    
-    /// The absolute horizontal starting coordinate of the shape on the canvas.
     let x: Double
-    
-    /// The absolute vertical starting coordinate of the shape on the canvas.
     let y: Double
-    
-    /// The total width of the shape.
-    let width: Double
-    
-    /// The total height of the shape.
-    let height: Double
-    
-    /// The fill color of the shape, represented as a standard CSS hex string (e.g., "#FF0000").
+    let size: Double
     let color: String
-    
-    /// The corner radius for rounded shapes. Used extensively for modern UI components.
+}
+
+/// Defines the payload required to update the color context within the canvas engine.
+struct ColorPayload: Encodable {
+    let hexCode: String
+}
+
+/// Defines the payload required to draw a sophisticated, geometric shape directly (legacy).
+struct DrawShapePayload: Encodable {
+    let id: String
+    let type: String
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+    let color: String
     let cornerRadius: Double
 }
 
 /// Defines the payload required to clear the canvas environment entirely.
 struct ClearCanvasPayload: Encodable {
-    
-    /// Specifies whether the clearing action should be smoothly animated (e.g., a fade out) or instantaneous.
     let animated: Bool
 }
