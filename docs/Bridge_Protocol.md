@@ -38,6 +38,10 @@ Sent via `window.webkit.messageHandlers.canvasBridge.postMessage(jsonString)`.
 * `event`: String identifying the lifecycle or interaction event.
 * `payload`: Associated data object.
 
+**Lifecycle Events & Pre-Warming**
+Because the `WKWebView` engine is heavily pre-warmed via the `WebViewService` during app launch, the `lifecycle: ready` event may fire *before* the user actively navigates to the canvas screen. 
+- **State Management**: The native `WebViewModel` is designed to gracefully receive these background events, ensuring it can immediately synchronize with an already-initialized bridge state upon UI mounting.
+
 ### 3. Native-Only Actions
 Certain architectural operations are performed entirely on the native layer and bypass the JSON messaging bridge:
 - **Snapshotting**: Triggered natively via the `takeSnapshot(with:)` API directly on the `WKWebView`. This operation securely captures the out-of-process web buffer into a native `UIImage`, relying purely on the static state of the HTML5 canvas at the exact moment of capture without necessitating any JS-side execution or payload overhead.

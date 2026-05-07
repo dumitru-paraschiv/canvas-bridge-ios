@@ -12,7 +12,7 @@ Dependency injection is managed centrally using **Swinject**.
 - **Assemblies**: 
   - `FlowAssembly`: Registers factory closures for Coordinators (`AppFlow`, `MainFlow`).
   - `ModuleAssembly`: Registers the MVVM modules (e.g., configuring `MainView` by instantiating `MainViewModel`, `MainViewUI`, and `MainViewController`, then binding their inputs/outputs).
-  - `ServiceAssembly`: Reserved for shared services and data providers.
+  - `ServiceAssembly`: Registers shared services and resource-heavy process managers. Notably, `WebViewService` is registered as a Singleton (`.container` scope) to ensure the web engine boots exactly once and is readily accessible to the Main module.
 - **Injection Flow**: When a Flow needs to navigate, it relies on Factory protocols (e.g., `ModuleFactory`, `FlowFactory`). It invokes a `make...()` function which queries the Swinject `Resolver` to construct the destination view hierarchy and inject its dependencies, passing it back to the Flow to be pushed onto the navigation stack.
 
 ## 3. Navigation Flow
@@ -42,3 +42,8 @@ To integrate the hybrid canvas into the native application:
 - **Core Wrapper**: The `WebViewUI` module (`CanvasBridge/CanvasBridge/Modules/Web/`) wraps `WKWebView` inside a `UIViewRepresentable`, suppressing native scrolling and applying transparency to blend perfectly with SwiftUI.
 - **CanvasToolbarUI**: A highly polished, glassmorphic SwiftUI component residing in the Main module. It utilizes a **Grouped Contextual Design**—segmented into distinct capsules for History, Creation, and Output—to optimize for HIG-compliant hit targets and information architecture. It observes the `WebViewModel` to dispatch commands down to the JavaScript engine and trigger native actions like snapshots.
 - **Assembly Registration**: The web dependencies and the Main module composition are wired together inside `ModuleAssembly.swift` to ensure dependency injection remains intact.
+
+## 7. Service Layer & Pre-Warming
+To eliminate latency and "white-flash" artifacts when loading the hybrid environment, the application utilizes a `WebViewService`.
+- **Pre-Initialization**: The `WebViewService` instantly initializes the `WKWebView` and triggers the WebContent process to load the HTML/JS assets during the app's launch sequence, completely decoupled from UI navigation.
+- **Lifecycle Optimization**: By the time the user navigates to the canvas screen, the JavaScript rendering engine has already booted in the background. The `WebViewUI` simply requests this pre-warmed instance, resulting in instantaneous native-level transition speeds.
