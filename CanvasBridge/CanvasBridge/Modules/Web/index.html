@@ -157,6 +157,11 @@
             redoStack = [];
         }
 
+        // State Synchronization
+        function syncStateToSwift() {
+            sendMessageToSwift("sync_state", { "shapes": shapes });
+        }
+
         // 3. Swift -> JS (Commands)
         window.updateCanvasState = function (jsonString) {
             try {
@@ -168,25 +173,42 @@
                     saveStateToUndo();
                     shapes.push(p);
                     redraw();
+                    syncStateToSwift();
                 } else if (action === "clear_canvas") {
                     saveStateToUndo();
                     shapes = [];
                     redraw();
+                    syncStateToSwift();
                 } else if (action === "undo") {
                     if (undoStack.length > 0) {
                         redoStack.push(JSON.parse(JSON.stringify(shapes)));
                         shapes = undoStack.pop();
                         redraw();
+                        syncStateToSwift();
                     }
                 } else if (action === "redo") {
                     if (redoStack.length > 0) {
                         undoStack.push(JSON.parse(JSON.stringify(shapes)));
                         shapes = redoStack.pop();
                         redraw();
+                        syncStateToSwift();
                     }
                 } else if (action === "change_color") {
                     if (p && p.hexCode) {
                         currentColor = p.hexCode;
+                    }
+                } else if (action === "system_warning") {
+                    if (p && p.instruction === "purge_history") {
+                        undoStack = [];
+                        redoStack = [];
+                        console.log("[CanvasBridge] WARNING: Memory pressure detected. Purged history stacks.");
+                    }
+                } else if (action === "hydrate_state") {
+                    if (p && p.shapes) {
+                        shapes = p.shapes;
+                        undoStack = [];
+                        redoStack = [];
+                        redraw();
                     }
                 }
             } catch (error) {

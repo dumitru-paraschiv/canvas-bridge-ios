@@ -6,10 +6,11 @@
 //
 
 import SwiftUI
+import CanvasBridgeCore
 
 struct CanvasToolbarUI: View {
     
-    @ObservedObject var viewModel: WebViewModel
+    @ObservedObject var engine: CanvasStateEngine
     
     // Data source for cycling colors
     private let shapeColorsHex = [
@@ -29,18 +30,18 @@ struct CanvasToolbarUI: View {
             // MARK: - Group 1: History
             HStack(spacing: 16) {
                 Button {
-                    viewModel.undo()
+                    engine.undo()
                 } label: {
                     Image(systemName: "arrow.uturn.backward")
                 }
-                .disabled(!viewModel.isCanvasReady)
+                .disabled(!engine.isCanvasReady)
                 
                 Button {
-                    viewModel.redo()
+                    engine.redo()
                 } label: {
                     Image(systemName: "arrow.uturn.forward")
                 }
-                .disabled(!viewModel.isCanvasReady)
+                .disabled(!engine.isCanvasReady)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
@@ -53,14 +54,14 @@ struct CanvasToolbarUI: View {
             // MARK: - Group 2: Creation & Tooling
             HStack(spacing: 20) {
                 Button {
-                    viewModel.addShape(type: "rect", color: shapeColorsHex[colorIndex])
+                    engine.addShape(type: "rect", color: shapeColorsHex[colorIndex])
                 } label: {
                     Image(systemName: "square.fill")
                         .foregroundColor(shapeColors[colorIndex])
                 }
                 
                 Button {
-                    viewModel.addShape(type: "circle", color: shapeColorsHex[colorIndex])
+                    engine.addShape(type: "circle", color: shapeColorsHex[colorIndex])
                 } label: {
                     Image(systemName: "circle.fill")
                         .foregroundColor(shapeColors[colorIndex])
@@ -68,7 +69,7 @@ struct CanvasToolbarUI: View {
                 
                 Button {
                     colorIndex = (colorIndex + 1) % shapeColorsHex.count
-                    viewModel.updateColor(hex: shapeColorsHex[colorIndex])
+                    engine.updateColor(hex: shapeColorsHex[colorIndex])
                 } label: {
                     Image(systemName: "paintpalette")
                         .foregroundColor(shapeColors[colorIndex])
@@ -85,19 +86,19 @@ struct CanvasToolbarUI: View {
             // MARK: - Group 3: Destructive / Export Actions
             HStack(spacing: 16) {
                 Button {
-                    viewModel.requestSnapshot()
+                    engine.requestSnapshot()
                 } label: {
                     Image(systemName: "camera.viewfinder")
                 }
-                .disabled(!viewModel.isCanvasReady)
+                .disabled(!engine.isCanvasReady)
                 
                 Button {
-                    viewModel.clear()
+                    engine.clear()
                 } label: {
                     Image(systemName: "trash")
                         .foregroundColor(.red)
                 }
-                .disabled(!viewModel.isCanvasReady)
+                .disabled(!engine.isCanvasReady)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)

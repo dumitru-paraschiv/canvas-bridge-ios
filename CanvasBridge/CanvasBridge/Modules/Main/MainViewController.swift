@@ -7,6 +7,7 @@
 
 import Combine
 import SwiftUI
+import CanvasBridgeCore
 
 final class MainViewController: BaseHostingController<MainViewUI>, MainView {
     
@@ -22,7 +23,8 @@ final class MainViewController: BaseHostingController<MainViewUI>, MainView {
 struct MainViewUI: View {
     
     @ObservedObject var viewModel: MainViewModel
-    @ObservedObject var webViewModel: WebViewModel
+    @ObservedObject var engine: CanvasStateEngine
+    let webViewService: WebViewService
     
     var body: some View {
         ZStack {
@@ -32,14 +34,14 @@ struct MainViewUI: View {
             
             // Bridge Layer
             WebViewUI(
-                viewModel: webViewModel,
-                outgoingCommand: $webViewModel.outgoingCommand,
-                webViewService: webViewModel.webViewService
+                engine: engine,
+                outgoingCommand: $engine.outgoingCommand,
+                webViewService: webViewService
             )
                 .ignoresSafeArea()
             
             // Process Recovery Overlay
-            if webViewModel.isProcessTerminated {
+            if engine.isProcessTerminated {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 44))
@@ -49,7 +51,7 @@ struct MainViewUI: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
                     
-                    if let error = webViewModel.connectionError {
+                    if let error = engine.connectionError {
                         Text(error)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -60,7 +62,7 @@ struct MainViewUI: View {
                     Button(action: {
                         let generator = UIImpactFeedbackGenerator(style: .medium)
                         generator.impactOccurred()
-                        webViewModel.reloadCanvas()
+                        engine.reloadCanvas()
                     }) {
                         Text("Refresh Engine")
                             .fontWeight(.semibold)
@@ -82,23 +84,27 @@ struct MainViewUI: View {
             VStack {
                 Spacer()
                 
-                CanvasToolbarUI(viewModel: webViewModel)
+                CanvasToolbarUI(engine: engine)
                     .padding(.bottom, 40)
             }
         }
         // Native Haptic Feedback for Web Canvas Interactions
-        .onChange(of: webViewModel.lastTappedCoordinates) { _ in
+        .onChange(of: engine.lastTappedCoordinates) { _ in
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
         }
         // Share Sheet for exporting Canvas Snapshot
         .sheet(isPresented: Binding(
-            get: { webViewModel.snapshotImage != nil },
-            set: { if !$0 { webViewModel.snapshotImage = nil } }
+            get: { engine.snapshotData != nil },
+            set: { if !$0 { engine.snapshotData = nil } }
         )) {
-            if let image = webViewModel.snapshotImage {
+            if let data = engine.snapshotData, let image = UIImage(data: data) {
                 ShareSheet(items: [image])
             }
+        }
+        // Memory Warning Handling (Jetsam Mitigation)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+            engine.triggerMemoryPurge()
         }
     }
 }

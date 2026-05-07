@@ -1,5 +1,5 @@
 # CanvasBridge 🌉
-**Version: v1.4.0**
+**Version: v1.4.2**
 
 A highly polished, production-ready Proof of Concept demonstrating a flawless, bidirectional JSON message bridge between native Swift and a local HTML5/JavaScript canvas.
 
@@ -9,12 +9,17 @@ CanvasBridge explores the architectural patterns required to build a scalable na
 ## Architectural Highlights
 * **MVVM-C & Swinject:** Strict separation of concerns. Navigation is handled by UIKit Coordinators, dependencies are injected via Swinject, and the presentation layer is built entirely in SwiftUI.
 * **Structured Concurrency:** Utilizes modern Swift 5.9+ `@MainActor` isolation to guarantee thread-safe UI updates and state mutations.
+* **Protocol-Oriented Architecture:** Heavy utilization of Protocol-Oriented Programming (e.g., `StorageProvider` injection) to abstract platform-specific I/O, allowing the core state machine to remain platform-agnostic.
 * **Strict JSON Envelope Protocol:** Bidirectional communication utilizes a strict envelope pattern. Swift `Codable` enums and structs ensure defensive decoding of web events and type-safe command serialization.
-* **Decoupled State Engine:** The `WebViewModel` acts as the single source of truth, completely abstracting the `WKWebView` from the SwiftUI presentation layer.
+* **Decoupled State Engine:** The `CanvasStateEngine` acts as the single source of truth, completely abstracting the `WKWebView` from the SwiftUI presentation layer.
 * **Native UX Polish & Grouped Contextual Toolbar:** The web view seamlessly ignores safe areas (via `viewport-fit=cover`), handles Retina DPI scaling, and triggers native physical haptics (`UIImpactFeedbackGenerator`) synced to web canvas interactions. The UI features a newly redesigned, glassmorphic Grouped Contextual Toolbar ensuring scalable, HIG-compliant hit targets as the feature set expands.
 
+## Multiplatform Readiness
+The core bridging logic, strict JSON protocol definitions, and the `CanvasStateEngine` state machine have been completely decoupled from UIKit and WebKit. They are housed in a standalone, pure Swift Package Manager module (`CanvasBridgeCore`) with zero external dependencies. This ensures the foundational domain logic is ready for immediate deployment to macOS, visionOS, or even a Linux-based server environment without modification.
+
 ## Features
-* **Security & Resilience:** Implements Strict Navigation Sandboxing to completely block external URL requests and script injections. Features an **Automated Process Recovery** system that gracefully catches out-of-process engine terminations, securely locks down the UI state, and mounts a native recovery flow to reboot the rendering engine without requiring a full app restart.
+* **Security & Resilience:** Implements Strict Navigation Sandboxing to completely block external URL requests and script injections. Features an **Automated Process Recovery** system that gracefully catches out-of-process engine terminations, securely locks down the UI state, and mounts a native recovery flow. Features **Memory Heuristics (Jetsam Mitigation)** that proactively orchestrates garbage collection across the Swift/JS boundary during high memory pressure, preventing silent OS terminations without disrupting the user's visual state.
+* **Deterministic State Hydration:** Graceful handling of app terminations via continuous background JSON serialization. Injects saved binary states into the web engine upon cold boots for zero-data-loss session restoration.
 * **Advanced WebKit Snapshotting:** Securely captures the out-of-process web buffer directly into a native `UIImage` using asynchronous `WKWebView` APIs, allowing for seamless export and sharing via the native iOS Share Sheet.
 * **Reactive Rendering & History:** The canvas engine handles dynamic object placement (Rectangles, Circles), dynamic color palettes, and robust history management via `undoStack` and `redoStack`.
 

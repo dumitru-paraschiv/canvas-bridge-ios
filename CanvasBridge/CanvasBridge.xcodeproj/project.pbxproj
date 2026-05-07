@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2ABA297C2FAC3FC7004A8243 /* Swinject in Frameworks */ = {isa = PBXBuildFile; productRef = 2ABA297B2FAC3FC7004A8243 /* Swinject */; };
+		2AD042E22FACA4FC00D5B6BE /* CanvasBridgeCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AD042E12FACA4FC00D5B6BE /* CanvasBridgeCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2AD042E22FACA4FC00D5B6BE /* CanvasBridgeCore in Frameworks */,
 				2ABA297C2FAC3FC7004A8243 /* Swinject in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -131,6 +133,7 @@
 			name = CanvasBridge;
 			packageProductDependencies = (
 				2ABA297B2FAC3FC7004A8243 /* Swinject */,
+				2AD042E12FACA4FC00D5B6BE /* CanvasBridgeCore */,
 			);
 			productName = CanvasBridge;
 			productReference = 2ABA279B2FAC3D49004A8243 /* CanvasBridge.app */;
@@ -216,6 +219,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				2ABA297A2FAC3FC7004A8243 /* XCRemoteSwiftPackageReference "Swinject" */,
+				2AD042E02FACA4FC00D5B6BE /* XCLocalSwiftPackageReference "../CanvasBridgeCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2ABA279C2FAC3D49004A8243 /* Products */;
@@ -625,6 +629,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		2AD042E02FACA4FC00D5B6BE /* XCLocalSwiftPackageReference "../CanvasBridgeCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../CanvasBridgeCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		2ABA297A2FAC3FC7004A8243 /* XCRemoteSwiftPackageReference "Swinject" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -641,6 +652,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2ABA297A2FAC3FC7004A8243 /* XCRemoteSwiftPackageReference "Swinject" */;
 			productName = Swinject;
+		};
+		2AD042E12FACA4FC00D5B6BE /* CanvasBridgeCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CanvasBridgeCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
