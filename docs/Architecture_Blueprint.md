@@ -20,14 +20,24 @@ The app's startup routing follows this sequence:
 1. **SceneDelegate**: Intercepts app launch, configures the `UIWindow`, and instantiates the `DefaultAppFlow`.
 2. **AppFlow (Root Coordinator)**: In its `start()` method, it triggers the `showMainFlow()` routine.
 3. **MainFlow (Sub-Coordinator)**: Constructed and retained by `AppFlow`. Calling `start()` triggers `showMainView(with: MainModel())`.
-4. **MainModule Initialization**: The Swinject `ModuleAssembly` injects `MainModel` into `MainViewModel`, wraps the SwiftUI `MainViewUI` (which currently displays `Text("Main")`) inside `MainViewController`, and binds their Combine pipelines.
-5. **Display**: `MainViewController` (a `BaseHostingController`) is set as the root of the navigation stack, rendering the current blank SwiftUI screen.
+4. **MainModule Initialization**: The Swinject `ModuleAssembly` injects `MainModel` into `MainViewModel`, wraps the SwiftUI `MainViewUI` inside `MainViewController`, and binds their Combine pipelines.
+5. **Display**: `MainViewController` (a `BaseHostingController`) is set as the root of the navigation stack, rendering the SwiftUI screen.
 
-## 4. Integration Points
-To integrate a new `WKWebView` Representable and its corresponding ViewModel:
-- **Target Module Folder**: Create a new module inside `CanvasBridge/CanvasBridge/Modules/` (e.g., `CanvasBridge/CanvasBridge/Modules/Web/`).
-- **Implementation Structure**: 
-  - Implement a `WebViewUI` conforming to `UIViewRepresentable` to bridge `WKWebView` into SwiftUI.
-  - Implement `WebViewModel`, `WebViewController` (inheriting from `BaseHostingController<WebViewUI>`), and `WebModel`.
-- **Dependency Registration**: Add the new module assembly definition inside `CanvasBridge/CanvasBridge/Dependencies/ModuleAssembly.swift` to handle its DI.
-- **Routing**: Extend `MainFlow` (or create a new `WebFlow`) and add routing steps in `MainViewSteps` to trigger navigation to the new Web view from the Main screen.
+## 4. Web Module Architecture
+The bridge between the native iOS layer and the HTML5 Canvas relies on a strictly typed, unidirectional data flow governed by the `WebViewModel`.
+- **Single Source of Truth**: The `WebViewModel` acts as the definitive state engine for the web layer, ensuring consistency across the hybrid environment.
+- **Strict Concurrency**: Annotated with `@MainActor`, it guarantees that all UI updates, state modifications, and JSON parsing occur safely on the main thread, adhering to modern Swift concurrency guidelines.
+- **State Tracking & History**: It actively monitors the canvas lifecycle (`isCanvasReady`) and user interaction history (e.g., `lastTappedCoordinates` for driving native haptics).
+- **Centralized Dispatch**: All commands sent to the JavaScript environment are strictly modeled as generic `CanvasCommand` payloads and encoded/decoded centrally to prevent malformed data transactions.
+
+## 5. JavaScript Engine
+The HTML5 web layer is not a static DOM tree, but a fully reactive rendering engine.
+- **Render Loop**: The canvas uses an active rendering loop, clearing and redrawing its contents dynamically based on its internal state.
+- **Object-Based State Array**: Instead of immediate-mode painting, the canvas maintains an internal state array (`shapes`) containing all geometric objects and their properties. The render loop iterates over this array to draw the scene.
+- **History Management**: To support complex editing features, the engine employs an `undoStack` and `redoStack`. Changes to the `shapes` array are recorded as immutable snapshots, enabling robust undo/redo capabilities without native intervention.
+
+## 6. Presentation Layer & Integration Points
+To integrate the hybrid canvas into the native application:
+- **Core Wrapper**: The `WebViewUI` module (`CanvasBridge/CanvasBridge/Modules/Web/`) wraps `WKWebView` inside a `UIViewRepresentable`, suppressing native scrolling and applying transparency to blend perfectly with SwiftUI.
+- **CanvasToolbarUI**: A decoupled, highly polished, glassmorphic SwiftUI component residing in the Main module. It acts as the primary control surface overlaid on the canvas. It observes the `WebViewModel` to dispatch commands (like adding shapes) down to the JavaScript engine.
+- **Assembly Registration**: The web dependencies and the Main module composition are wired together inside `ModuleAssembly.swift` to ensure dependency injection remains intact.
