@@ -19,12 +19,13 @@ final class WebViewModel: ObservableObject {
     /// Stores the exact coordinates of the user's last interaction with the canvas.
     @Published var lastTappedCoordinates: CGPoint? = nil
     
+    /// Centralized binding to safely dispatch encoded JSON commands to the Web layer.
+    @Published var outgoingCommand: String? = nil
+    
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
     
-    init() {
-        // Any specific encoder/decoder configurations (e.g., date formats, key strategies) can be set here.
-    }
+    init() {}
     
     // MARK: - Incoming Communication (JS -> Swift)
     
@@ -63,6 +64,42 @@ final class WebViewModel: ObservableObject {
             lastTappedCoordinates = point
             trace("👆 Canvas Interaction: User performed '\(type)' on node '\(nodeId)' at \(point).")
         }
+    }
+    
+    // MARK: - Outgoing Command Dispatch Helpers
+    
+    func addShape(type: String, color: String) {
+        let payload = AddShapePayload(
+            id: UUID().uuidString,
+            type: type,
+            x: Double.random(in: 40...300),
+            y: Double.random(in: 100...600),
+            size: Double.random(in: 50...120),
+            color: color
+        )
+        let command = CanvasCommand(action: "add_shape", payload: payload)
+        outgoingCommand = generateCommandString(for: command)
+    }
+    
+    func undo() {
+        let command = CanvasCommand(action: "undo", payload: EmptyPayload())
+        outgoingCommand = generateCommandString(for: command)
+    }
+    
+    func redo() {
+        let command = CanvasCommand(action: "redo", payload: EmptyPayload())
+        outgoingCommand = generateCommandString(for: command)
+    }
+    
+    func clear() {
+        let command = CanvasCommand(action: "clear_canvas", payload: EmptyPayload())
+        outgoingCommand = generateCommandString(for: command)
+    }
+    
+    func updateColor(hex: String) {
+        let payload = ColorPayload(hexCode: hex)
+        let command = CanvasCommand(action: "change_color", payload: payload)
+        outgoingCommand = generateCommandString(for: command)
     }
     
     // MARK: - Outgoing Communication (Swift -> JS)
