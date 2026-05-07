@@ -26,6 +26,10 @@ enum CanvasEvent: Decodable {
     ///   - y: The precise vertical coordinate of the interaction relative to the canvas origin.
     case interaction(type: String, nodeId: String, x: Double, y: Double)
     
+    /// Triggered when the web layer synchronizes its full state array with the native layer.
+    /// - Parameter shapes: An array of currently active shapes on the canvas.
+    case syncState(shapes: [ShapePayload])
+    
     /// Keys used to decode the outer envelope of the incoming JSON message.
     private enum EnvelopeKeys: String, CodingKey {
         case event
@@ -43,6 +47,11 @@ enum CanvasEvent: Decodable {
         case nodeId = "node_id" // Maps the JS snake_case key to Swift camelCase
         case x
         case y
+    }
+    
+    /// Keys used to decode the payload of a sync_state event.
+    private enum SyncStatePayloadKeys: String, CodingKey {
+        case shapes
     }
     
     // MARK: - Decodable Implementation
@@ -72,6 +81,12 @@ enum CanvasEvent: Decodable {
             let y = try payloadContainer.decode(Double.self, forKey: .y)
             self = .interaction(type: type, nodeId: nodeId, x: x, y: y)
             
+        case "sync_state":
+            // Access the nested payload object for sync_state events
+            let payloadContainer = try envelopeContainer.nestedContainer(keyedBy: SyncStatePayloadKeys.self, forKey: .payload)
+            let shapes = try payloadContainer.decode([ShapePayload].self, forKey: .shapes)
+            self = .syncState(shapes: shapes)
+            
         default:
             // For strict typing in a production environment, throw an error on unknown events
             // to ensure the bridge protocol remains synchronized between JS and Swift.
@@ -99,11 +114,24 @@ struct CanvasCommand<T: Encodable>: Encodable {
 
 // MARK: - Command Payloads
 
+/// A generic representation of a shape on the canvas, used for state synchronization and hydration.
+struct ShapePayload: Codable, Equatable {
+    let id: String?
+    let type: String
+    let x: Double
+    let y: Double
+    let size: Double?
+    let width: Double?
+    let height: Double?
+    let color: String?
+    let cornerRadius: Double?
+}
+
 /// Represents an empty payload for commands that require no parameters (e.g., undo, redo).
-struct EmptyPayload: Encodable {}
+struct EmptyPayload: Codable, Equatable {}
 
 /// Defines the payload required to add a standard geometric shape to the canvas history.
-struct AddShapePayload: Encodable {
+struct AddShapePayload: Codable, Equatable {
     
     let id: String
     let type: String
@@ -114,13 +142,13 @@ struct AddShapePayload: Encodable {
 }
 
 /// Defines the payload required to update the color context within the canvas engine.
-struct ColorPayload: Encodable {
+struct ColorPayload: Codable, Equatable {
 
     let hexCode: String
 }
 
 /// Defines the payload required to draw a sophisticated, geometric shape directly (legacy).
-struct DrawShapePayload: Encodable {
+struct DrawShapePayload: Codable, Equatable {
 
     let id: String
     let type: String
@@ -133,13 +161,18 @@ struct DrawShapePayload: Encodable {
 }
 
 /// Defines the payload required to clear the canvas environment entirely.
-struct ClearCanvasPayload: Encodable {
+struct ClearCanvasPayload: Codable, Equatable {
 
     let animated: Bool
 }
 
 /// Defines the payload required to instruct the web layer to perform system-level operations.
-struct SystemWarningPayload: Encodable {
+struct SystemWarningPayload: Codable, Equatable {
 
     let instruction: String
+}
+
+/// Defines the payload required to hydrate the web engine with a predefined array of shapes.
+struct HydrateStatePayload: Codable, Equatable {
+    let shapes: [ShapePayload]
 }

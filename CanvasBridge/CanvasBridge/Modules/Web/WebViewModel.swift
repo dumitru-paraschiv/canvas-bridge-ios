@@ -54,6 +54,16 @@ final class WebViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
+    // MARK: - Local Persistence Helpers
+    
+    private func getDocumentsDirectory() -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    
+    private var saveFileURL: URL {
+        getDocumentsDirectory().appendingPathComponent("canvas_state.json")
+    }
+    
     // MARK: - Incoming Communication (JS -> Swift)
     
     /// Decodes and handles incoming messages from the JavaScript environment.
@@ -82,6 +92,9 @@ final class WebViewModel: ObservableObject {
             if status == "initialized" || status == "ready" {
                 isCanvasReady = true
                 trace("✅ Canvas Lifecycle: Status is '\(status)'. Bridge is ready.")
+                
+                // Automatically attempt to restore previous state from disk
+                attemptStateHydration()
             } else {
                 trace("ℹ️ Canvas Lifecycle Update: \(status)")
             }
@@ -90,6 +103,42 @@ final class WebViewModel: ObservableObject {
             let point = CGPoint(x: x, y: y)
             lastTappedCoordinates = point
             trace("👆 Canvas Interaction: User performed '\(type)' on node '\(nodeId)' at \(point).")
+            
+        case let .syncState(shapes):
+            trace("💾 State Sync: Received \(shapes.count) shapes from Canvas. Writing to disk...")
+            Task {
+                do {
+                    let data = try encoder.encode(shapes)
+                    try data.write(to: saveFileURL, options: [.atomic, .completeFileProtection])
+                    trace("✅ State Sync: Successfully persisted state to disk.")
+                } catch {
+                    trace("❌ State Sync Error: Failed to write state to disk. \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    // MARK: - State Hydration
+    
+    /// Attempts to read the saved canvas state from disk and hydrate the JavaScript rendering engine.
+    private func attemptStateHydration() {
+        Task {
+            do {
+                guard FileManager.default.fileExists(atPath: saveFileURL.path) else {
+                    trace("ℹ️ Hydration: No saved state found on disk. Booting fresh canvas.")
+                    return
+                }
+                
+                let data = try Data(contentsOf: saveFileURL)
+                let shapes = try decoder.decode([ShapePayload].self, from: data)
+                
+                trace("💧 Hydration: Loaded \(shapes.count) shapes from disk. Dispatching to WebContent...")
+                let payload = HydrateStatePayload(shapes: shapes)
+                let command = CanvasCommand(action: "hydrate_state", payload: payload)
+                outgoingCommand = generateCommandString(for: command)
+            } catch {
+                trace("❌ Hydration Error: Failed to load or decode saved state. Booting fresh canvas. \(error.localizedDescription)")
+            }
         }
     }
     

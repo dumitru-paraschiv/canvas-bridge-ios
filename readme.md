@@ -1,5 +1,5 @@
 # CanvasBridge 🌉
-**Version: v1.4.0**
+**Version: v1.4.2**
 
 A highly polished, production-ready Proof of Concept demonstrating a flawless, bidirectional JSON message bridge between native Swift and a local HTML5/JavaScript canvas.
 
@@ -15,6 +15,7 @@ CanvasBridge explores the architectural patterns required to build a scalable na
 
 ## Features
 * **Security & Resilience:** Implements Strict Navigation Sandboxing to completely block external URL requests and script injections. Features an **Automated Process Recovery** system that gracefully catches out-of-process engine terminations, securely locks down the UI state, and mounts a native recovery flow. Features **Memory Heuristics (Jetsam Mitigation)** that proactively orchestrates garbage collection across the Swift/JS boundary during high memory pressure, preventing silent OS terminations without disrupting the user's visual state.
+* **Deterministic State Hydration:** Graceful handling of app terminations via continuous background JSON serialization. Injects saved binary states into the web engine upon cold boots for zero-data-loss session restoration.
 * **Advanced WebKit Snapshotting:** Securely captures the out-of-process web buffer directly into a native `UIImage` using asynchronous `WKWebView` APIs, allowing for seamless export and sharing via the native iOS Share Sheet.
 * **Reactive Rendering & History:** The canvas engine handles dynamic object placement (Rectangles, Circles), dynamic color palettes, and robust history management via `undoStack` and `redoStack`.
 
