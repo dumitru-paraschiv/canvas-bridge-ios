@@ -7,13 +7,14 @@
 
 import SwiftUI
 import WebKit
+import CanvasBridgeCore
 
 @MainActor
 struct WebViewUI: UIViewRepresentable {
     
     // MARK: - Properties
     
-    @ObservedObject var viewModel: WebViewModel
+    @ObservedObject var engine: CanvasStateEngine
     @Binding var outgoingCommand: String?
     let webViewService: WebViewService
     
@@ -60,26 +61,26 @@ struct WebViewUI: UIViewRepresentable {
         }
         
         // Handle Snapshot Requests
-        if viewModel.triggerSnapshot {
-            let capturedViewModel = viewModel
+        if engine.triggerSnapshot {
+            let capturedEngine = engine
             uiView.takeSnapshot(with: nil) { image, error in
                 if let error = error {
                     trace("⚠️ Snapshot Error: \(error.localizedDescription)")
-                } else if let image = image {
+                } else if let image = image, let data = image.pngData() {
                     Task { @MainActor in
-                        capturedViewModel.didCaptureSnapshot(image)
+                        capturedEngine.didCaptureSnapshot(data)
                     }
                 }
             }
         }
         
         // Handle Reload Requests
-        if viewModel.triggerReload {
+        if engine.triggerReload {
             trace("🔄 WebViewUI: Executing WKWebView reload to recover WebContent process.")
             uiView.reload()
             
             Task { @MainActor in
-                self.viewModel.triggerReload = false
+                self.engine.triggerReload = false
             }
         }
     }
@@ -100,7 +101,7 @@ struct WebViewUI: UIViewRepresentable {
             if message.name == "canvasBridge" {
                 if let payloadString = message.body as? String {
                     // Route the string payload to the ViewModel for decoding and state updates
-                    parent.viewModel.handleIncomingMessage(payloadString)
+                    parent.engine.handleIncomingMessage(payloadString)
                 } else {
                     trace("⚠️ Received message body is not a String: \(message.body)")
                 }
@@ -133,7 +134,7 @@ struct WebViewUI: UIViewRepresentable {
         /// Detects if the WebContent process crashes (e.g., due to memory pressure).
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             trace("💥 WebView Crash: The WebContent process terminated unexpectedly.")
-            parent.viewModel.handleProcessTermination()
+            parent.engine.handleProcessTermination()
         }
     }
 }
