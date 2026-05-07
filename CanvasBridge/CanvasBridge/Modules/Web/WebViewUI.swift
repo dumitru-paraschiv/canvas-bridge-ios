@@ -69,6 +69,20 @@ struct WebViewUI: UIViewRepresentable {
                 self.outgoingCommand = nil
             }
         }
+        
+        // Handle Snapshot Requests
+        if viewModel.triggerSnapshot {
+            let capturedViewModel = viewModel
+            uiView.takeSnapshot(with: nil) { image, error in
+                if let error = error {
+                    trace("⚠️ Snapshot Error: \(error.localizedDescription)")
+                } else if let image = image {
+                    Task { @MainActor in
+                        capturedViewModel.didCaptureSnapshot(image)
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Coordinator (WKScriptMessageHandler)

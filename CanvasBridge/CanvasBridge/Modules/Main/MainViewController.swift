@@ -47,5 +47,26 @@ struct MainViewUI: View {
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
         }
+        // Share Sheet for exporting Canvas Snapshot
+        .sheet(isPresented: Binding(
+            get: { webViewModel.snapshotImage != nil },
+            set: { if !$0 { webViewModel.snapshotImage = nil } }
+        )) {
+            if let image = webViewModel.snapshotImage {
+                ShareSheet(items: [image])
+            }
+        }
     }
+}
+
+// MARK: - Share Sheet Helper
+
+struct ShareSheet: UIViewControllerRepresentable {
+    var items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

@@ -1,4 +1,5 @@
 # CanvasBridge 🌉
+**Version: v1.1.0**
 
 A highly polished, production-ready Proof of Concept demonstrating a flawless, bidirectional JSON message bridge between native Swift and a local HTML5/JavaScript canvas.
 
@@ -10,12 +11,17 @@ CanvasBridge explores the architectural patterns required to build a scalable na
 * **Structured Concurrency:** Utilizes modern Swift 5.9+ `@MainActor` isolation to guarantee thread-safe UI updates and state mutations.
 * **Strict JSON Envelope Protocol:** Bidirectional communication utilizes a strict envelope pattern. Swift `Codable` enums and structs ensure defensive decoding of web events and type-safe command serialization.
 * **Decoupled State Engine:** The `WebViewModel` acts as the single source of truth, completely abstracting the `WKWebView` from the SwiftUI presentation layer.
-* **Native UX Polish:** The web view seamlessly ignores safe areas (via `viewport-fit=cover`), handles Retina DPI scaling, and triggers native physical haptics (`UIImpactFeedbackGenerator`) synced to web canvas interactions.
+* **Native UX Polish & Grouped Contextual Toolbar:** The web view seamlessly ignores safe areas (via `viewport-fit=cover`), handles Retina DPI scaling, and triggers native physical haptics (`UIImpactFeedbackGenerator`) synced to web canvas interactions. The UI features a newly redesigned, glassmorphic Grouped Contextual Toolbar ensuring scalable, HIG-compliant hit targets as the feature set expands.
+
+## Features
+* **Advanced WebKit Snapshotting:** Securely captures the out-of-process web buffer directly into a native `UIImage` using asynchronous `WKWebView` APIs, allowing for seamless export and sharing via the native iOS Share Sheet.
+* **Reactive Rendering & History:** The canvas engine handles dynamic object placement (Rectangles, Circles), dynamic color palettes, and robust history management via `undoStack` and `redoStack`.
 
 ## The Bridge Protocol
-Communication occurs over two distinct channels:
+Communication occurs over distinct channels:
 1.  **Commands (Swift -> JS):** `window.updateCanvasState(jsonString)`
 2.  **Events (JS -> Swift):** `window.webkit.messageHandlers.canvasBridge.postMessage(payload)`
+3.  **Native-to-Global Capture:** While most manipulations are bidirectional JSON messages, *Snapshotting* leverages a specialized native operation that elegantly bypasses the JSON layer to snapshot the static JS rendering buffer.
 
 State history (Undo/Redo) and object rendering (Shapes/Colors) are fully managed via this strict JSON contract.
 
